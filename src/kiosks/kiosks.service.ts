@@ -5,13 +5,14 @@ import { randomUUID } from 'crypto';
 
 @Injectable()
 export class KiosksService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
-  async create(data: CreateKioskDto) {
+  async create(companyId: string, data: CreateKioskDto) {
     return this.prisma.kiosk.create({
       data: {
         name: data.name,
         branchId: data.branchId,
+        companyId,
         token: randomUUID(),
       },
       include: {
@@ -20,8 +21,9 @@ export class KiosksService {
     });
   }
 
-  async findAll() {
+  async findAll(companyId: string) {
     return this.prisma.kiosk.findMany({
+      where: { companyId },
       include: {
         branch: true,
       },
@@ -31,22 +33,26 @@ export class KiosksService {
     });
   }
 
-  async findOne(id: string) {
-    return this.prisma.kiosk.findUnique({
-      where: { id },
+  async findOne(companyId: string, id: string) {
+    return this.prisma.kiosk.findFirst({
+      where: { id, companyId },
       include: {
         branch: true,
       },
     });
   }
 
-  async remove(id: string) {
-    return this.prisma.kiosk.update({
-      where: { id },
+  async remove(companyId: string, id: string) {
+    return this.prisma.kiosk.updateMany({
+      where: { id, companyId },
       data: { active: false },
-      include: {
-        branch: true,
-      },
+    });
+  }
+
+  async updateStatus(companyId: string, id: string, active: boolean) {
+    return this.prisma.kiosk.updateMany({
+      where: { id, companyId },
+      data: { active },
     });
   }
 
@@ -55,16 +61,7 @@ export class KiosksService {
       where: { token },
       include: {
         branch: true,
-      },
-    });
-  }
-
-  async updateStatus(id: string, active: boolean) {
-    return this.prisma.kiosk.update({
-      where: { id },
-      data: { active },
-      include: {
-        branch: true,
+        company: true,
       },
     });
   }

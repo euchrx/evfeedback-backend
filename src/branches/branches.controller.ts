@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { BranchesService } from './branches.service';
@@ -19,27 +20,31 @@ export class BranchesController {
   constructor(private service: BranchesService) {}
 
   @Post()
-  create(@Body() body: CreateBranchDto) {
-    return this.service.create(body);
+  create(@Req() req: any, @Body() body: CreateBranchDto) {
+    return this.service.create(req.user.companyId, body);
   }
 
   @Get()
-  findAll() {
-    return this.service.findAll();
+  findAll(@Req() req: any) {
+    return this.service.findAll(req.user.companyId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  findOne(@Req() req: any, @Param('id') id: string) {
+    return this.service.findOne(req.user.companyId, id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: UpdateBranchDto) {
-    return this.service.update(id, body);
+  update(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: UpdateBranchDto,
+  ) {
+    return this.service.update(req.user.companyId, id, body);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  remove(@Req() req: any, @Param('id') id: string) {
+    return this.service.remove(req.user.companyId, id);
   }
 }

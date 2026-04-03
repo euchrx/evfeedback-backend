@@ -7,34 +7,38 @@ import { UpdateBranchDto } from './dto/update-branch.dto';
 export class BranchesService {
   constructor(private prisma: PrismaService) {}
 
-  create(data: CreateBranchDto) {
+  create(companyId: string, data: CreateBranchDto) {
     return this.prisma.branch.create({
-      data,
+      data: {
+        ...data,
+        companyId,
+      },
     });
   }
 
-  findAll() {
+  findAll(companyId: string) {
     return this.prisma.branch.findMany({
+      where: { companyId },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  findOne(id: string) {
-    return this.prisma.branch.findUnique({
-      where: { id },
+  findOne(companyId: string, id: string) {
+    return this.prisma.branch.findFirst({
+      where: { id, companyId },
     });
   }
 
-  update(id: string, data: UpdateBranchDto) {
-    return this.prisma.branch.update({
-      where: { id },
+  update(companyId: string, id: string, data: UpdateBranchDto) {
+    return this.prisma.branch.updateMany({
+      where: { id, companyId },
       data,
     });
   }
 
-  remove(id: string) {
-    return this.prisma.branch.delete({
-      where: { id },
+  remove(companyId: string, id: string) {
+    return this.prisma.branch.deleteMany({
+      where: { id, companyId },
     });
   }
 }

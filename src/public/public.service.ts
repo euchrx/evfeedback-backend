@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { KiosksService } from '../kiosks/kiosks.service';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
@@ -27,6 +31,7 @@ export class PublicService {
         comment: dto.comment,
         kioskId: kiosk.id,
         branchId: kiosk.branchId,
+        companyId: kiosk.companyId,
       },
     });
 

@@ -17,15 +17,32 @@ model User {
   email        String   @unique
   passwordHash String
   role         UserRole @default(ADMIN)
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  active    Boolean  @default(true)
+  users     User[]
+  branches  Branch[]
+  kiosks    Kiosk[]
+  feedbacks Feedback[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 
 model Branch {
   id        String     @id @default(cuid())
   name      String
   code      String?    @unique
   active    Boolean    @default(true)
+  companyId String
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   kiosks    Kiosk[]
   feedbacks Feedback[]
   createdAt DateTime   @default(now())
@@ -38,6 +55,8 @@ model Kiosk {
   token               String     @unique
   locationDescription String?
   active              Boolean    @default(true)
+  companyId String
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   branchId            String
   branch              Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
   feedbacks           Feedback[]
@@ -60,8 +79,10 @@ model Feedback {
   id        String        @id @default(cuid())
   rating    Int
   comment   String?
+  companyId String
   kioskId   String
   branchId  String
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   kiosk     Kiosk         @relation(fields: [kioskId], references: [id], onDelete: Cascade)
   branch    Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
   tags      FeedbackTag[]

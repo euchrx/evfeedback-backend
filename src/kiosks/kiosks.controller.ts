@@ -1,40 +1,53 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Param,
+  Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { KiosksService } from './kiosks.service';
 import { CreateKioskDto } from './dto/create-kiosk.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { Delete, Param, Patch } from "@nestjs/common";
 
 @UseGuards(JwtAuthGuard)
 @Controller('kiosks')
 export class KiosksController {
-  constructor(private service: KiosksService) { }
+  constructor(private readonly kiosksService: KiosksService) {}
 
   @Post()
-  create(@Body() body: CreateKioskDto) {
-    return this.service.create(body);
-  }
-
-  @Delete(":id")
-  remove(@Param("id") id: string) {
-    return this.service.remove(id);
+  create(@Req() req: any, @Body() body: CreateKioskDto) {
+    return this.kiosksService.create(req.user.companyId, body);
   }
 
   @Get()
-  findAll() {
-    return this.service.findAll();
+  findAll(@Req() req: any) {
+    return this.kiosksService.findAll(req.user.companyId);
+  }
+
+  @Get(':id')
+  findOne(@Req() req: any, @Param('id') id: string) {
+    return this.kiosksService.findOne(req.user.companyId, id);
   }
 
   @Patch(':id/status')
   updateStatus(
+    @Req() req: any,
     @Param('id') id: string,
     @Body() body: { active: boolean },
   ) {
-    return this.service.updateStatus(id, body.active);
+    return this.kiosksService.updateStatus(
+      req.user.companyId,
+      id,
+      body.active,
+    );
+  }
+
+  @Delete(':id')
+  remove(@Req() req: any, @Param('id') id: string) {
+    return this.kiosksService.remove(req.user.companyId, id);
   }
 }

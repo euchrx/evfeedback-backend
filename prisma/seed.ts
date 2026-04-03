@@ -19,6 +19,16 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
+  const company = await prisma.company.upsert({
+    where: { id: "default_company" },
+    update: {},
+    create: {
+      id: "default_company",
+      name: "Empresa Padrão",
+      active: true,
+    },
+  });
+
   const passwordHash = await bcrypt.hash("123456", 10);
 
   await prisma.user.upsert({
@@ -29,10 +39,11 @@ async function main() {
       email: "admin@admin.com",
       passwordHash,
       role: "ADMIN",
+      companyId: company.id,
     },
   });
 
-  console.log("✅ Admin criado com sucesso");
+  console.log("✅ Seed multiempresa concluído");
 }
 
 main()
