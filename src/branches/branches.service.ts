@@ -18,27 +18,44 @@ export class BranchesService {
 
   findAll(companyId: string) {
     return this.prisma.branch.findMany({
-      where: { companyId },
+      where: {
+        companyId,
+        active: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   findOne(companyId: string, id: string) {
     return this.prisma.branch.findFirst({
-      where: { id, companyId },
+      where: {
+        id,
+        companyId,
+        active: true,
+      },
     });
   }
 
   update(companyId: string, id: string, data: UpdateBranchDto) {
     return this.prisma.branch.updateMany({
-      where: { id, companyId },
+      where: {
+        id,
+        companyId,
+        active: true,
+      },
       data,
     });
   }
 
   remove(companyId: string, id: string) {
-    return this.prisma.branch.deleteMany({
-      where: { id, companyId },
+    return this.prisma.branch.updateMany({
+      where: {
+        id,
+        companyId,
+      },
+      data: {
+        active: false,
+      },
     });
   }
 }

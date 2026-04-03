@@ -41,6 +41,8 @@ export class PublicService {
           id: {
             in: dto.tagIds,
           },
+          companyId: kiosk.companyId,
+          active: true,
         },
         select: {
           id: true,

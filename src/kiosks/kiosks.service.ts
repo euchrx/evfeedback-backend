@@ -23,7 +23,9 @@ export class KiosksService {
 
   async findAll(companyId: string) {
     return this.prisma.kiosk.findMany({
-      where: { companyId },
+      where: {
+        companyId,
+      },
       include: {
         branch: true,
       },
@@ -35,7 +37,10 @@ export class KiosksService {
 
   async findOne(companyId: string, id: string) {
     return this.prisma.kiosk.findFirst({
-      where: { id, companyId },
+      where: {
+        id,
+        companyId,
+      },
       include: {
         branch: true,
       },
@@ -44,15 +49,25 @@ export class KiosksService {
 
   async remove(companyId: string, id: string) {
     return this.prisma.kiosk.updateMany({
-      where: { id, companyId },
-      data: { active: false },
+      where: {
+        id,
+        companyId,
+      },
+      data: {
+        active: false,
+      },
     });
   }
 
   async updateStatus(companyId: string, id: string, active: boolean) {
     return this.prisma.kiosk.updateMany({
-      where: { id, companyId },
-      data: { active },
+      where: {
+        id,
+        companyId,
+      },
+      data: {
+        active,
+      },
     });
   }
 

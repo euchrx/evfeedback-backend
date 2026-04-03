@@ -10,7 +10,7 @@ type DashboardFilters = {
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
-  private buildDateFilter(filters?: DashboardFilters) {
+  private buildDateRange(filters?: DashboardFilters) {
     if (!filters?.dateFrom && !filters?.dateTo) {
       return undefined;
     }
@@ -27,13 +27,23 @@ export class DashboardService {
       createdAt.lte = endDate;
     }
 
-    return { createdAt };
+    return createdAt;
   }
 
-  async getSummary(filters?: DashboardFilters) {
-    const where = this.buildDateFilter(filters);
+  async getSummary(companyId: string, filters?: DashboardFilters) {
+    const createdAt = this.buildDateRange(filters);
 
-    const total = await this.prisma.feedback.count({ where });
+    const where: any = {
+      companyId,
+    };
+
+    if (createdAt) {
+      where.createdAt = createdAt;
+    }
+
+    const total = await this.prisma.feedback.count({
+      where,
+    });
 
     const average = await this.prisma.feedback.aggregate({
       where,
@@ -47,11 +57,12 @@ export class DashboardService {
     });
 
     const feedbackTags = await this.prisma.feedbackTag.findMany({
-      where: where
-        ? {
-            feedback: where,
-          }
-        : undefined,
+      where: {
+        feedback: {
+          companyId,
+          ...(createdAt ? { createdAt } : {}),
+        },
+      },
       include: {
         tag: true,
       },
@@ -82,15 +93,18 @@ export class DashboardService {
     };
   }
 
-  async getByBranch(filters?: DashboardFilters) {
-    const feedbackWhere = this.buildDateFilter(filters);
+  async getByBranch(companyId: string, filters?: DashboardFilters) {
+    const createdAt = this.buildDateRange(filters);
 
     const branches = await this.prisma.branch.findMany({
+      where: {
+        companyId,
+      },
       select: {
         id: true,
         name: true,
         feedbacks: {
-          where: feedbackWhere,
+          where: createdAt ? { createdAt } : undefined,
           select: {
             rating: true,
           },

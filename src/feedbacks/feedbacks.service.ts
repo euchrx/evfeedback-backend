@@ -12,8 +12,10 @@ type FeedbackFilters = {
 export class FeedbacksService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(filters: FeedbackFilters) {
-    const where: any = {};
+  async findAll(companyId: string, filters: FeedbackFilters) {
+    const where: any = {
+      companyId,
+    };
 
     if (filters.rating) {
       const rating = Number(filters.rating);

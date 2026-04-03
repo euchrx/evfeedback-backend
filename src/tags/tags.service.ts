@@ -5,23 +5,36 @@ import { PrismaService } from '../prisma/prisma.service';
 export class TagsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(companyId: string) {
     return this.prisma.tag.findMany({
+      where: {
+        companyId,
+        active: true,
+      },
       orderBy: {
         name: 'asc',
       },
     });
   }
 
-  async create(name: string) {
+  async create(companyId: string, name: string) {
     return this.prisma.tag.create({
-      data: { name },
+      data: {
+        name,
+        companyId,
+      },
     });
   }
 
-  async remove(id: string) {
-    return this.prisma.tag.delete({
-      where: { id },
+  async remove(companyId: string, id: string) {
+    return this.prisma.tag.updateMany({
+      where: {
+        id,
+        companyId,
+      },
+      data: {
+        active: false,
+      },
     });
   }
 }
