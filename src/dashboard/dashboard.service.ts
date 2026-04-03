@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class DashboardService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async getSummary() {
     const total = await this.prisma.feedback.count();
@@ -51,5 +51,38 @@ export class DashboardService {
       ratings,
       topTags,
     };
+  }
+
+  async getByBranch() {
+    const branches = await this.prisma.branch.findMany({
+      select: {
+        id: true,
+        name: true,
+        feedbacks: {
+          select: {
+            rating: true,
+          },
+        },
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    return branches.map((branch) => {
+      const total = branch.feedbacks.length;
+
+      const averageRating =
+        total > 0
+          ? branch.feedbacks.reduce((sum, item) => sum + item.rating, 0) / total
+          : 0;
+
+      return {
+        id: branch.id,
+        name: branch.name,
+        totalFeedbacks: total,
+        averageRating: Number(averageRating.toFixed(1)),
+      };
+    });
   }
 }

@@ -8,7 +8,7 @@ import {
 import { KiosksService } from './kiosks.service';
 import { CreateKioskDto } from './dto/create-kiosk.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { Delete, Param } from "@nestjs/common";
+import { Delete, Param, Patch } from "@nestjs/common";
 
 @UseGuards(JwtAuthGuard)
 @Controller('kiosks')
@@ -28,5 +28,13 @@ export class KiosksController {
   @Get()
   findAll() {
     return this.service.findAll();
+  }
+
+  @Patch(':id/status')
+  updateStatus(
+    @Param('id') id: string,
+    @Body() body: { active: boolean },
+  ) {
+    return this.service.updateStatus(id, body.active);
   }
 }

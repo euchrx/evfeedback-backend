@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 
 @Injectable()
 export class KiosksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(data: CreateKioskDto) {
     return this.prisma.kiosk.create({
@@ -41,14 +41,28 @@ export class KiosksService {
   }
 
   async remove(id: string) {
-    return this.prisma.kiosk.delete({
+    return this.prisma.kiosk.update({
       where: { id },
+      data: { active: false },
+      include: {
+        branch: true,
+      },
     });
   }
 
   async findByToken(token: string) {
     return this.prisma.kiosk.findUnique({
       where: { token },
+      include: {
+        branch: true,
+      },
+    });
+  }
+
+  async updateStatus(id: string, active: boolean) {
+    return this.prisma.kiosk.update({
+      where: { id },
+      data: { active },
       include: {
         branch: true,
       },

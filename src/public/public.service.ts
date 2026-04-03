@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { KiosksService } from '../kiosks/kiosks.service';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
@@ -15,6 +15,10 @@ export class PublicService {
 
     if (!kiosk) {
       throw new NotFoundException('Kiosk inválido');
+    }
+
+    if (kiosk.active === false) {
+      throw new ForbiddenException('Kiosk inativo');
     }
 
     const feedback = await this.prisma.feedback.create({
