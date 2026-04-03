@@ -9,6 +9,7 @@ import { PublicModule } from './public/public.module';
 import { DashboardService } from './dashboard/dashboard.service';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { FeedbacksModule } from './feedbacks/feedbacks.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     KiosksModule,
     PublicModule,
     DashboardModule,
+    FeedbacksModule,
   ],
   providers: [DashboardService],
   controllers: [DashboardController],
