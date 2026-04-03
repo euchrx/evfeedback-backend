@@ -1,13 +1,23 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { PublicService } from './public.service';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
 
-@Controller('kiosk')
+@Controller()
 export class PublicController {
-  constructor(private service: PublicService) {}
+  constructor(private readonly publicService: PublicService) { }
 
-  @Post('feedback')
-  create(@Body() body: CreateFeedbackDto) {
-    return this.service.createFeedback(body);
+  @Get('kiosk/config')
+  getKioskConfig(@Query('token') token?: string) {
+    return this.publicService.getKioskConfig(token ?? '');
+  }
+
+  @Post('kiosk/feedback')
+  createFeedback(@Body() dto: CreateFeedbackDto) {
+    return this.publicService.createFeedback(dto);
+  }
+
+  @Get('kiosk/tags')
+  getKioskTags(@Query('token') token?: string) {
+    return this.publicService.getKioskTags(token ?? '');
   }
 }

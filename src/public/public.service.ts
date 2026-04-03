@@ -12,7 +12,50 @@ export class PublicService {
   constructor(
     private prisma: PrismaService,
     private kiosksService: KiosksService,
-  ) {}
+  ) { }
+
+  async getKioskConfig(token: string) {
+    const kiosk = await this.kiosksService.findByToken(token);
+
+    if (!kiosk) {
+      throw new NotFoundException('Kiosk inválido');
+    }
+
+    if (kiosk.active === false) {
+      throw new ForbiddenException('Kiosk inativo');
+    }
+
+    const setting = await this.prisma.setting.findUnique({
+      where: {
+        companyId: kiosk.companyId,
+      },
+    });
+
+    return {
+      kiosk: {
+        id: kiosk.id,
+        name: kiosk.name,
+        active: kiosk.active,
+      },
+      company: {
+        id: kiosk.company.id,
+        name: setting?.companyName || kiosk.company.name,
+        logoUrl: setting?.logoUrl || null,
+        thankYouMessage:
+          setting?.thankYouMessage || 'Obrigado pela sua avaliação!',
+        primaryColor: setting?.primaryColor || '#0ea5e9',
+        kioskResetSeconds: setting?.kioskResetSeconds ?? 5,
+        heroTitle: setting?.heroTitle || 'Como foi sua experiência hoje?',
+        heroSubtitle:
+          setting?.heroSubtitle || 'Toque em uma opção para avaliar rapidamente.',
+        backgroundColor: setting?.backgroundColor || '#020617',
+        backgroundImageUrl: setting?.backgroundImageUrl || null,
+        cardBackgroundColor: setting?.cardBackgroundColor || 'rgba(15,23,42,0.72)',
+        textColor: setting?.textColor || '#ffffff',
+        buttonTextColor: setting?.buttonTextColor || '#0f172a',
+      },
+    };
+  }
 
   async createFeedback(dto: CreateFeedbackDto) {
     const kiosk = await this.kiosksService.findByToken(dto.token);
@@ -63,5 +106,31 @@ export class PublicService {
     }
 
     return { success: true };
+  }
+
+  async getKioskTags(token: string) {
+    const kiosk = await this.kiosksService.findByToken(token);
+
+    if (!kiosk) {
+      throw new NotFoundException('Kiosk inválido');
+    }
+
+    if (kiosk.active === false) {
+      throw new ForbiddenException('Kiosk inativo');
+    }
+
+    return this.prisma.tag.findMany({
+      where: {
+        companyId: kiosk.companyId,
+        active: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
   }
 }

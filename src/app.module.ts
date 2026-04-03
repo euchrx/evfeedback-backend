@@ -11,6 +11,7 @@ import { DashboardController } from './dashboard/dashboard.controller';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { FeedbacksModule } from './feedbacks/feedbacks.module';
 import { TagsModule } from './tags/tags.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { TagsModule } from './tags/tags.module';
     DashboardModule,
     FeedbacksModule,
     TagsModule,
+    SettingsModule,
   ],
   providers: [DashboardService],
   controllers: [DashboardController],
