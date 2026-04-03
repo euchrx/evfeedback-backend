@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(ADMIN)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Branch {
+  id        String     @id @default(cuid())
+  name      String
+  code      String?    @unique
+  active    Boolean    @default(true)
+  kiosks    Kiosk[]
+  feedbacks Feedback[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Kiosk {
+  id                  String     @id @default(cuid())
+  name                String
+  token               String     @unique
+  locationDescription String?
+  active              Boolean    @default(true)
+  branchId            String
+  branch              Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  feedbacks           Feedback[]
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+}
+
+model Tag {
+  id        String        @id @default(cuid())
+  name      String
+  type      String?
+  active    Boolean       @default(true)
+  items     FeedbackTag[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model Feedback {
+  id        String        @id @default(cuid())
+  rating    Int
+  comment   String?
+  kioskId   String
+  branchId  String
+  kiosk     Kiosk         @relation(fields: [kioskId], references: [id], onDelete: Cascade)
+  branch    Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  tags      FeedbackTag[]
+  createdAt DateTime      @default(now())
+}
+
+model FeedbackTag {
+  id         String   @id @default(cuid())
+  feedbackId String
+  tagId      String
+  feedback   Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([feedbackId, tagId])
+}
+
+model Setting {
+  id                String   @id @default(cuid())
+  companyName       String?
+  logoUrl           String?
+  thankYouMessage   String?
+  primaryColor      String?
+  kioskResetSeconds Int      @default(5)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
