@@ -22,6 +22,12 @@ export class KiosksService {
     });
   }
 
+  async remove(id: string) {
+  return this.prisma.kiosk.delete({
+    where: { id },
+  });
+}
+
   findAll() {
     return this.prisma.kiosk.findMany({
       include: {
