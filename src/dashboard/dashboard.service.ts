@@ -1,49 +1,78 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+type DashboardFilters = {
+  dateFrom?: string;
+  dateTo?: string;
+};
+
 @Injectable()
 export class DashboardService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
-  async getSummary() {
-    const total = await this.prisma.feedback.count();
+  private buildDateFilter(filters?: DashboardFilters) {
+    if (!filters?.dateFrom && !filters?.dateTo) {
+      return undefined;
+    }
+
+    const createdAt: Record<string, Date> = {};
+
+    if (filters.dateFrom) {
+      createdAt.gte = new Date(filters.dateFrom);
+    }
+
+    if (filters.dateTo) {
+      const endDate = new Date(filters.dateTo);
+      endDate.setHours(23, 59, 59, 999);
+      createdAt.lte = endDate;
+    }
+
+    return { createdAt };
+  }
+
+  async getSummary(filters?: DashboardFilters) {
+    const where = this.buildDateFilter(filters);
+
+    const total = await this.prisma.feedback.count({ where });
 
     const average = await this.prisma.feedback.aggregate({
+      where,
       _avg: { rating: true },
     });
 
     const ratingsRaw = await this.prisma.feedback.groupBy({
       by: ['rating'],
+      where,
       _count: { rating: true },
     });
 
-    const tagsRaw = await this.prisma.feedbackTag.groupBy({
-      by: ['tagId'],
-      _count: { tagId: true },
+    const feedbackTags = await this.prisma.feedbackTag.findMany({
+      where: where
+        ? {
+            feedback: where,
+          }
+        : undefined,
+      include: {
+        tag: true,
+      },
     });
 
-    const safeRatings = Array.isArray(ratingsRaw) ? ratingsRaw : [];
-    const safeTags = Array.isArray(tagsRaw) ? tagsRaw : [];
+    const tagCounter = new Map<string, number>();
 
-    const tagIds = safeTags.map((t) => t.tagId);
+    for (const item of feedbackTags) {
+      const name = item.tag?.name ?? 'N/A';
+      tagCounter.set(name, (tagCounter.get(name) ?? 0) + 1);
+    }
 
-    const tagDetails = await this.prisma.tag.findMany({
-      where: { id: { in: tagIds } },
-    });
+    const topTags = Array.from(tagCounter.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
-    const ratings = safeRatings.map((r) => ({
+    const ratings = (Array.isArray(ratingsRaw) ? ratingsRaw : []).map((r) => ({
       rating: r.rating,
       count: r._count.rating,
     }));
-
-    const topTags = safeTags.map((t) => {
-      const tag = tagDetails.find((td) => td.id === t.tagId);
-
-      return {
-        name: tag?.name || 'N/A',
-        count: t._count.tagId,
-      };
-    });
 
     return {
       total,
@@ -53,12 +82,15 @@ export class DashboardService {
     };
   }
 
-  async getByBranch() {
+  async getByBranch(filters?: DashboardFilters) {
+    const feedbackWhere = this.buildDateFilter(filters);
+
     const branches = await this.prisma.branch.findMany({
       select: {
         id: true,
         name: true,
         feedbacks: {
+          where: feedbackWhere,
           select: {
             rating: true,
           },

@@ -1,19 +1,25 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('dashboard')
 export class DashboardController {
-  constructor(private service: DashboardService) { }
+  constructor(private service: DashboardService) {}
 
   @Get('summary')
-  getSummary() {
-    return this.service.getSummary();
+  getSummary(
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.service.getSummary({ dateFrom, dateTo });
   }
 
   @Get('by-branch')
-  getByBranch() {
-    return this.service.getByBranch();
+  getByBranch(
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.service.getByBranch({ dateFrom, dateTo });
   }
 }
