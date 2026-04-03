@@ -26,17 +26,31 @@ export class PublicService {
       },
     });
 
-    if (dto.tagIds?.length) {
-      await this.prisma.feedbackTag.createMany({
-        data: dto.tagIds.map((tagId) => ({
-          feedbackId: feedback.id,
-          tagId,
-        })),
+    if (Array.isArray(dto.tagIds) && dto.tagIds.length > 0) {
+      const validTags = await this.prisma.tag.findMany({
+        where: {
+          id: {
+            in: dto.tagIds,
+          },
+        },
+        select: {
+          id: true,
+        },
       });
+
+      const validTagIds = validTags.map((tag) => tag.id);
+
+      if (validTagIds.length > 0) {
+        await this.prisma.feedbackTag.createMany({
+          data: validTagIds.map((tagId) => ({
+            feedbackId: feedback.id,
+            tagId,
+          })),
+          skipDuplicates: true,
+        });
+      }
     }
 
-    return {
-      success: true,
-    };
+    return { success: true };
   }
 }
