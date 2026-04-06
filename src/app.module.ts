@@ -12,6 +12,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { FeedbacksModule } from './feedbacks/feedbacks.module';
 import { TagsModule } from './tags/tags.module';
 import { SettingsModule } from './settings/settings.module';
+import { CompaniesModule } from './companies/companies.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SettingsModule } from './settings/settings.module';
     PrismaModule,
     AuthModule,
     UsersModule,
+    CompaniesModule,
     BranchesModule,
     KiosksModule,
     PublicModule,

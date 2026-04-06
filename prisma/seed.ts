@@ -19,31 +19,55 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
-  const company = await prisma.company.upsert({
-    where: { id: "default_company" },
-    update: {},
-    create: {
-      id: "default_company",
-      name: "Empresa Padrão",
-      active: true,
-    },
+  let company = await prisma.company.findFirst({
+    where: { name: "Empresa Padrão" },
   });
+
+  if (!company) {
+    company = await prisma.company.create({
+      data: {
+        name: "Empresa Padrão",
+        active: true,
+      },
+    });
+  }
 
   const passwordHash = await bcrypt.hash("123456", 10);
 
-  await prisma.user.upsert({
+  const existingUser = await prisma.user.findUnique({
     where: { email: "admin@admin.com" },
-    update: {},
-    create: {
-      name: "Admin",
-      email: "admin@admin.com",
-      passwordHash,
-      role: "ADMIN",
-      companyId: company.id,
-    },
   });
 
-  console.log("✅ Seed multiempresa concluído");
+  if (!existingUser) {
+    await prisma.user.create({
+      data: {
+        name: "Admin Global",
+        email: "admin@admin.com",
+        passwordHash,
+        role: "SUPER_ADMIN",
+        companyId: company.id,
+        active: true,
+      },
+    });
+  }
+
+  const existingSetting = await prisma.setting.findUnique({
+    where: { companyId: company.id },
+  });
+
+  if (!existingSetting) {
+    await prisma.setting.create({
+      data: {
+        companyId: company.id,
+        companyName: "Empresa Padrão",
+        thankYouMessage: "Obrigado pela sua avaliação!",
+        primaryColor: "#0ea5e9",
+        kioskResetSeconds: 5,
+      },
+    });
+  }
+
+  console.log("✅ Seed concluído");
 }
 
 main()
