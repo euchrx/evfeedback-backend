@@ -11,7 +11,6 @@ export class CompaniesService {
     return this.prisma.company.create({
       data: {
         name: data.name,
-        slug: data.slug,
       },
     });
   }

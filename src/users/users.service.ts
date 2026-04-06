@@ -6,7 +6,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   findByEmail(email: string) {
     return this.prisma.user.findUnique({
@@ -14,15 +14,25 @@ export class UsersService {
     });
   }
 
-  createAsSuperAdmin(data: CreateUserDto) {
-    return this.createInternal(data.companyId!, data);
+  async createGlobal(data: CreateUserDto) {
+    const passwordHash = await bcrypt.hash(data.password, 10);
+
+    return this.prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        passwordHash,
+        role: data.role,
+        companyId: data.companyId!,
+        active: true,
+      },
+      include: {
+        company: true,
+      },
+    });
   }
 
-  createForCompany(companyId: string, data: CreateUserDto) {
-    return this.createInternal(companyId, data);
-  }
-
-  private async createInternal(companyId: string, data: CreateUserDto) {
+  async createForCompany(companyId: string, data: CreateUserDto) {
     const passwordHash = await bcrypt.hash(data.password, 10);
 
     return this.prisma.user.create({
@@ -32,49 +42,35 @@ export class UsersService {
         passwordHash,
         role: data.role,
         companyId,
+        active: true,
+      },
+      include: {
+        company: true,
       },
     });
   }
 
-  findAllForSuperAdmin() {
+  findAllGlobal() {
     return this.prisma.user.findMany({
       include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        company: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
   }
 
   findAllByCompany(companyId: string) {
     return this.prisma.user.findMany({
-      where: { companyId },
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+      where: {
+        companyId,
       },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  findOneByCompany(companyId: string, id: string) {
-    return this.prisma.user.findFirst({
-      where: { id, companyId },
       include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        company: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
   }
@@ -83,12 +79,19 @@ export class UsersService {
     return this.prisma.user.findUnique({
       where: { id },
       include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        company: true,
+      },
+    });
+  }
+
+  findOneByCompany(companyId: string, id: string) {
+    return this.prisma.user.findFirst({
+      where: {
+        id,
+        companyId,
+      },
+      include: {
+        company: true,
       },
     });
   }
@@ -109,15 +112,23 @@ export class UsersService {
     return this.prisma.user.update({
       where: { id },
       data: updateData,
+      include: {
+        company: true,
+      },
     });
   }
 
   async updateByCompany(companyId: string, id: string, data: UpdateUserDto) {
     const existing = await this.prisma.user.findFirst({
-      where: { id, companyId },
+      where: {
+        id,
+        companyId,
+      },
     });
 
-    if (!existing) return null;
+    if (!existing) {
+      return null;
+    }
 
     const updateData: any = {
       name: data.name,
@@ -133,26 +144,38 @@ export class UsersService {
     return this.prisma.user.update({
       where: { id },
       data: updateData,
+      include: {
+        company: true,
+      },
     });
   }
 
   removeGlobal(id: string) {
     return this.prisma.user.update({
       where: { id },
-      data: { active: false },
+      data: {
+        active: false,
+      },
     });
   }
 
   async removeByCompany(companyId: string, id: string) {
     const existing = await this.prisma.user.findFirst({
-      where: { id, companyId },
+      where: {
+        id,
+        companyId,
+      },
     });
 
-    if (!existing) return null;
+    if (!existing) {
+      return null;
+    }
 
     return this.prisma.user.update({
       where: { id },
-      data: { active: false },
+      data: {
+        active: false,
+      },
     });
   }
 }

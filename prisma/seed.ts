@@ -44,25 +44,9 @@ async function main() {
         name: "Admin Global",
         email: "admin@admin.com",
         passwordHash,
-        role: "SUPER_ADMIN",
+        role: "ADMIN",
         companyId: company.id,
         active: true,
-      },
-    });
-  }
-
-  const existingSetting = await prisma.setting.findUnique({
-    where: { companyId: company.id },
-  });
-
-  if (!existingSetting) {
-    await prisma.setting.create({
-      data: {
-        companyId: company.id,
-        companyName: "Empresa Padrão",
-        thankYouMessage: "Obrigado pela sua avaliação!",
-        primaryColor: "#0ea5e9",
-        kioskResetSeconds: 5,
       },
     });
   }
