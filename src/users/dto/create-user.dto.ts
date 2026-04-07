@@ -4,4 +4,5 @@ export class CreateUserDto {
   password: string;
   role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
   companyId?: string;
+  active?: boolean;
 }

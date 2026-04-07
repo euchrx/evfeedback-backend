@@ -2,13 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 type DashboardFilters = {
+  companyId?: string;
   dateFrom?: string;
   dateTo?: string;
 };
 
 @Injectable()
 export class DashboardService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   private buildDateRange(filters?: DashboardFilters) {
     if (!filters?.dateFrom && !filters?.dateTo) {
@@ -30,11 +31,11 @@ export class DashboardService {
     return createdAt;
   }
 
-  async getSummary(companyId: string, filters?: DashboardFilters) {
+  async getSummary(filters?: DashboardFilters) {
     const createdAt = this.buildDateRange(filters);
 
     const where: any = {
-      companyId,
+      ...(filters?.companyId ? { companyId: filters.companyId } : {}),
     };
 
     if (createdAt) {
@@ -47,19 +48,23 @@ export class DashboardService {
 
     const average = await this.prisma.feedback.aggregate({
       where,
-      _avg: { rating: true },
+      _avg: {
+        rating: true,
+      },
     });
 
     const ratingsRaw = await this.prisma.feedback.groupBy({
       by: ['rating'],
       where,
-      _count: { rating: true },
+      _count: {
+        rating: true,
+      },
     });
 
     const feedbackTags = await this.prisma.feedbackTag.findMany({
       where: {
         feedback: {
-          companyId,
+          ...(filters?.companyId ? { companyId: filters.companyId } : {}),
           ...(createdAt ? { createdAt } : {}),
         },
       },
@@ -80,9 +85,9 @@ export class DashboardService {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    const ratings = (Array.isArray(ratingsRaw) ? ratingsRaw : []).map((r) => ({
-      rating: r.rating,
-      count: r._count.rating,
+    const ratings = (Array.isArray(ratingsRaw) ? ratingsRaw : []).map((item) => ({
+      rating: item.rating,
+      count: item._count.rating,
     }));
 
     return {
@@ -93,16 +98,23 @@ export class DashboardService {
     };
   }
 
-  async getByBranch(companyId: string, filters?: DashboardFilters) {
+  async getByBranch(filters?: DashboardFilters) {
     const createdAt = this.buildDateRange(filters);
 
     const branches = await this.prisma.branch.findMany({
       where: {
-        companyId,
+        ...(filters?.companyId ? { companyId: filters.companyId } : {}),
       },
       select: {
         id: true,
         name: true,
+        companyId: true,
+        company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         feedbacks: {
           where: createdAt ? { createdAt } : undefined,
           select: {
@@ -117,7 +129,6 @@ export class DashboardService {
 
     return branches.map((branch) => {
       const total = branch.feedbacks.length;
-
       const averageRating =
         total > 0
           ? branch.feedbacks.reduce((sum, item) => sum + item.rating, 0) / total
@@ -126,6 +137,8 @@ export class DashboardService {
       return {
         id: branch.id,
         name: branch.name,
+        companyId: branch.companyId,
+        company: branch.company,
         totalFeedbacks: total,
         averageRating: Number(averageRating.toFixed(1)),
       };

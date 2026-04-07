@@ -44,9 +44,21 @@ export class CompaniesController {
     return this.companiesService.update(id, body);
   }
 
+  @Patch(':id/deactivate')
+  @Roles('SUPER_ADMIN')
+  deactivate(@Param('id') id: string) {
+    return this.companiesService.deactivate(id);
+  }
+
+  @Patch(':id/activate')
+  @Roles('SUPER_ADMIN')
+  activate(@Param('id') id: string) {
+    return this.companiesService.activate(id);
+  }
+
   @Delete(':id')
   @Roles('SUPER_ADMIN')
-  remove(@Param('id') id: string) {
-    return this.companiesService.remove(id);
+  hardDelete(@Param('id') id: string) {
+    return this.companiesService.hardDelete(id);
   }
 }

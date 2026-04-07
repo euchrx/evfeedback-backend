@@ -1,70 +1,70 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
-type FeedbackFilters = {
-  rating?: string;
+type FindAllFeedbacksFilters = {
+  companyId?: string;
   branchId?: string;
-  dateFrom?: string;
-  dateTo?: string;
+  kioskId?: string;
+  rating?: string;
+  startDate?: string;
+  endDate?: string;
+  active?: string;
 };
 
 @Injectable()
 export class FeedbacksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(companyId: string, filters: FeedbackFilters) {
-    const where: any = {
-      companyId,
-    };
+  async findAll(filters: FindAllFeedbacksFilters) {
+    const where: any = {};
 
-    if (filters.rating) {
-      const rating = Number(filters.rating);
-      if (!Number.isNaN(rating)) {
-        where.rating = rating;
-      }
+    if (filters.companyId) {
+      where.companyId = filters.companyId;
     }
 
     if (filters.branchId) {
       where.branchId = filters.branchId;
     }
 
-    if (filters.dateFrom || filters.dateTo) {
+    if (filters.kioskId) {
+      where.kioskId = filters.kioskId;
+    }
+
+    if (filters.rating !== undefined && filters.rating !== '') {
+      const parsedRating = Number(filters.rating);
+
+      if (!Number.isNaN(parsedRating)) {
+        where.rating = parsedRating;
+      }
+    }
+
+    if (filters.active !== undefined && filters.active !== '') {
+      where.active = filters.active === 'true';
+    }
+
+    if (filters.startDate || filters.endDate) {
       where.createdAt = {};
 
-      if (filters.dateFrom) {
-        where.createdAt.gte = new Date(filters.dateFrom);
+      if (filters.startDate) {
+        where.createdAt.gte = new Date(filters.startDate);
       }
 
-      if (filters.dateTo) {
-        const endDate = new Date(filters.dateTo);
-        endDate.setHours(23, 59, 59, 999);
-        where.createdAt.lte = endDate;
+      if (filters.endDate) {
+        const end = new Date(filters.endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
       }
     }
 
     return this.prisma.feedback.findMany({
       where,
       include: {
-        kiosk: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        branch: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        company: true,
+        branch: true,
+        kiosk: true,
         tags: {
           include: {
-            tag: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
+            tag: true,
           },
         },
       },
@@ -72,5 +72,30 @@ export class FeedbacksService {
         createdAt: 'desc',
       },
     });
+  }
+
+  async findOne(id: string, companyId?: string) {
+    const feedback = await this.prisma.feedback.findFirst({
+      where: {
+        id,
+        ...(companyId ? { companyId } : {}),
+      },
+      include: {
+        company: true,
+        branch: true,
+        kiosk: true,
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
+      },
+    });
+
+    if (!feedback) {
+      throw new NotFoundException('Feedback não encontrado.');
+    }
+
+    return feedback;
   }
 }

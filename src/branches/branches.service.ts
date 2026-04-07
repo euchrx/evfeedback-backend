@@ -1,22 +1,29 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateBranchDto } from './dto/create-branch.dto';
-import { UpdateBranchDto } from './dto/update-branch.dto';
+
+type CreateBranchInput = {
+  name: string;
+  code?: string;
+  active?: boolean;
+  companyId?: string;
+};
+
+type UpdateBranchInput = {
+  name?: string;
+  code?: string;
+  active?: boolean;
+  companyId?: string;
+};
 
 @Injectable()
 export class BranchesService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
-  create(companyId: string, data: CreateBranchDto) {
-    return this.prisma.branch.create({
-      data: {
-        ...data,
-        companyId,
-      },
-    });
-  }
-
-  findAll(companyId?: string) {
+  async findAll(companyId?: string) {
     return this.prisma.branch.findMany({
       where: companyId ? { companyId } : undefined,
       include: {
@@ -28,35 +35,142 @@ export class BranchesService {
     });
   }
 
-  findOne(companyId: string, id: string) {
-    return this.prisma.branch.findFirst({
+  async findOne(id: string, companyId?: string) {
+    const branch = await this.prisma.branch.findFirst({
       where: {
         id,
-        companyId,
-        active: true,
+        ...(companyId ? { companyId } : {}),
+      },
+      include: {
+        company: true,
+      },
+    });
+
+    if (!branch) {
+      throw new NotFoundException('Filial não encontrada.');
+    }
+
+    return branch;
+  }
+
+  async create(data: CreateBranchInput) {
+    if (!data.name?.trim()) {
+      throw new BadRequestException('Nome da filial é obrigatório.');
+    }
+
+    if (!data.companyId) {
+      throw new BadRequestException('companyId é obrigatório.');
+    }
+
+    return this.prisma.branch.create({
+      data: {
+        name: data.name.trim(),
+        code: data.code?.trim() || null,
+        active: data.active ?? true,
+        companyId: data.companyId,
+      },
+      include: {
+        company: true,
       },
     });
   }
 
-  update(companyId: string, id: string, data: UpdateBranchDto) {
-    return this.prisma.branch.updateMany({
+  async update(
+    id: string,
+    companyId: string | undefined,
+    data: UpdateBranchInput,
+  ) {
+    const existing = await this.prisma.branch.findFirst({
       where: {
         id,
-        companyId,
-        active: true,
+        ...(companyId ? { companyId } : {}),
       },
-      data,
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Filial não encontrada.');
+    }
+
+    return this.prisma.branch.update({
+      where: {
+        id: existing.id,
+      },
+      data: {
+        ...(data.name !== undefined ? { name: data.name.trim() } : {}),
+        ...(data.code !== undefined ? { code: data.code?.trim() || null } : {}),
+        ...(data.active !== undefined ? { active: data.active } : {}),
+      },
+      include: {
+        company: true,
+      },
     });
   }
 
-  remove(companyId: string, id: string) {
-    return this.prisma.branch.updateMany({
+  async deactivate(id: string, companyId?: string) {
+    const existing = await this.prisma.branch.findFirst({
       where: {
         id,
-        companyId,
+        ...(companyId ? { companyId } : {}),
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Filial não encontrada.');
+    }
+
+    return this.prisma.branch.update({
+      where: {
+        id: existing.id,
       },
       data: {
         active: false,
+      },
+      include: {
+        company: true,
+      },
+    });
+  }
+
+  async activate(id: string, companyId?: string) {
+    const existing = await this.prisma.branch.findFirst({
+      where: {
+        id,
+        ...(companyId ? { companyId } : {}),
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Filial não encontrada.');
+    }
+
+    return this.prisma.branch.update({
+      where: {
+        id: existing.id,
+      },
+      data: {
+        active: true,
+      },
+      include: {
+        company: true,
+      },
+    });
+  }
+
+  async hardDelete(id: string, companyId?: string) {
+    const existing = await this.prisma.branch.findFirst({
+      where: {
+        id,
+        ...(companyId ? { companyId } : {}),
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Filial não encontrada.');
+    }
+
+    return this.prisma.branch.delete({
+      where: {
+        id: existing.id,
       },
     });
   }

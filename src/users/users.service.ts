@@ -1,182 +1,204 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
+type AuthUser = {
+  id: string;
+  email: string;
+  role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+  companyId?: string | null;
+};
+
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   findByEmail(email: string) {
-    return this.prisma.user.findFirst({
-      where: {
-        email,
-        active: true,
-      },
-    });
-  }
-
-  async createGlobal(data: CreateUserDto) {
-    if (!data.companyId) {
-      throw new BadRequestException(
-        'companyId é obrigatório para criação global de usuário',
-      );
-    }
-
-    const passwordHash = await bcrypt.hash(data.password, 10);
-
-    return this.prisma.user.create({
-      data: {
-        name: data.name,
-        email: data.email,
-        passwordHash,
-        role: data.role,
-        companyId: data.companyId,
-        active: true,
-      },
-      include: {
-        company: true,
-      },
-    });
-  }
-
-  async createForCompany(companyId: string, data: CreateUserDto) {
-    if (data.role === UserRole.SUPER_ADMIN) {
-      throw new BadRequestException(
-        'Usuário da empresa não pode criar SUPER_ADMIN',
-      );
-    }
-
-    const passwordHash = await bcrypt.hash(data.password, 10);
-
-    return this.prisma.user.create({
-      data: {
-        name: data.name,
-        email: data.email,
-        passwordHash,
-        role: data.role,
-        companyId,
-        active: true,
-      },
-      include: {
-        company: true,
-      },
-    });
-  }
-
-  findAllGlobal() {
-    return this.prisma.user.findMany({
-      where: {
-        active: true,
-      },
-      include: {
-        company: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-  }
-
-  findAllByCompany(companyId: string) {
-    return this.prisma.user.findMany({
-      where: {
-        companyId,
-        active: true,
-      },
-      include: {
-        company: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-  }
-
-  findOneGlobal(id: string) {
     return this.prisma.user.findUnique({
-      where: { id },
+      where: { email },
+      include: { company: true },
+    });
+  }
+
+  async findAll(companyId?: string) {
+    return this.prisma.user.findMany({
+      where: companyId ? { companyId } : undefined,
       include: {
         company: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
   }
 
-  findOneByCompany(companyId: string, id: string) {
-    return this.prisma.user.findFirst({
+  async findOne(id: string, companyId?: string) {
+    const user = await this.prisma.user.findFirst({
       where: {
         id,
-        companyId,
+        ...(companyId ? { companyId } : {}),
       },
       include: {
         company: true,
       },
     });
+
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+
+    return user;
   }
 
-  async updateGlobal(id: string, data: UpdateUserDto) {
-    const updateData: Prisma.UserUpdateInput = {};
-
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.email !== undefined) updateData.email = data.email;
-    if (data.role !== undefined) updateData.role = data.role;
-    if (data.active !== undefined) updateData.active = data.active;
-    if (data.companyId !== undefined) {
-      updateData.company = {
-        connect: { id: data.companyId },
-      };
+  async create(
+    companyId: string | undefined,
+    data: CreateUserDto,
+    actorRole: AuthUser['role'],
+  ) {
+    if (!companyId) {
+      throw new BadRequestException('companyId é obrigatório.');
     }
 
-    if (data.password) {
-      updateData.passwordHash = await bcrypt.hash(data.password, 10);
+    if (!data.name?.trim()) {
+      throw new BadRequestException('Nome é obrigatório.');
     }
 
-    return this.prisma.user.update({
-      where: { id },
-      data: updateData,
-      include: {
-        company: true,
-      },
-    });
-  }
-
-  async updateByCompany(companyId: string, id: string, data: UpdateUserDto) {
-    const existing = await this.prisma.user.findFirst({
-      where: {
-        id,
-        companyId,
-      },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Usuário não encontrado');
+    if (!data.email?.trim()) {
+      throw new BadRequestException('Email é obrigatório.');
     }
 
-    if (data.role === UserRole.SUPER_ADMIN) {
-      throw new BadRequestException(
-        'Usuário da empresa não pode definir role SUPER_ADMIN',
+    if (!data.password?.trim()) {
+      throw new BadRequestException('Senha é obrigatória.');
+    }
+
+    if (!data.role) {
+      throw new BadRequestException('Role é obrigatória.');
+    }
+
+    if (actorRole !== 'SUPER_ADMIN' && data.role === 'SUPER_ADMIN') {
+      throw new ForbiddenException(
+        'Apenas SUPER_ADMIN pode criar outro SUPER_ADMIN.',
       );
     }
 
-    const updateData: Prisma.UserUpdateInput = {};
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true },
+    });
 
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.email !== undefined) updateData.email = data.email;
-    if (data.role !== undefined) updateData.role = data.role;
-    if (data.active !== undefined) updateData.active = data.active;
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
+    }
 
-    if (data.password) {
+    const emailExists = await this.prisma.user.findUnique({
+      where: { email: data.email.trim() },
+      select: { id: true },
+    });
+
+    if (emailExists) {
+      throw new BadRequestException('Já existe um usuário com este email.');
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+
+    return this.prisma.user.create({
+      data: {
+        name: data.name.trim(),
+        email: data.email.trim().toLowerCase(),
+        passwordHash,
+        role: data.role,
+        companyId,
+        active: data.active ?? true,
+      },
+      include: {
+        company: true,
+      },
+    });
+  }
+
+  async update(
+    id: string,
+    companyId: string | undefined,
+    data: UpdateUserDto,
+    actor: AuthUser,
+  ) {
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        id,
+        ...(companyId ? { companyId } : {}),
+      },
+      include: {
+        company: true,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+
+    if (actor.role !== 'SUPER_ADMIN' && existing.role === 'SUPER_ADMIN') {
+      throw new ForbiddenException(
+        'Apenas SUPER_ADMIN pode alterar outro SUPER_ADMIN.',
+      );
+    }
+
+    if (actor.role !== 'SUPER_ADMIN' && data.role === 'SUPER_ADMIN') {
+      throw new ForbiddenException(
+        'Apenas SUPER_ADMIN pode promover alguém para SUPER_ADMIN.',
+      );
+    }
+
+    let targetCompanyId = existing.companyId;
+
+    if (actor.role === 'SUPER_ADMIN' && data.companyId !== undefined) {
+      const targetCompany = await this.prisma.company.findUnique({
+        where: { id: data.companyId },
+        select: { id: true },
+      });
+
+      if (!targetCompany) {
+        throw new NotFoundException('Empresa não encontrada.');
+      }
+
+      targetCompanyId = data.companyId;
+    }
+
+    if (data.email && data.email.trim().toLowerCase() !== existing.email) {
+      const emailExists = await this.prisma.user.findUnique({
+        where: { email: data.email.trim().toLowerCase() },
+        select: { id: true },
+      });
+
+      if (emailExists && emailExists.id !== existing.id) {
+        throw new BadRequestException('Já existe um usuário com este email.');
+      }
+    }
+
+    const updateData: any = {
+      ...(data.name !== undefined ? { name: data.name.trim() } : {}),
+      ...(data.email !== undefined
+        ? { email: data.email.trim().toLowerCase() }
+        : {}),
+      ...(data.role !== undefined ? { role: data.role } : {}),
+      ...(data.active !== undefined ? { active: data.active } : {}),
+      ...(actor.role === 'SUPER_ADMIN' && data.companyId !== undefined
+        ? { companyId: targetCompanyId }
+        : {}),
+    };
+
+    if (data.password?.trim()) {
       updateData.passwordHash = await bcrypt.hash(data.password, 10);
     }
 
     return this.prisma.user.update({
-      where: { id },
+      where: { id: existing.id },
       data: updateData,
       include: {
         company: true,
@@ -184,32 +206,86 @@ export class UsersService {
     });
   }
 
-  removeGlobal(id: string) {
-    return this.prisma.user.update({
-      where: { id },
-      data: {
-        active: false,
-      },
-    });
-  }
-
-  async removeByCompany(companyId: string, id: string) {
+  async deactivate(id: string, companyId: string | undefined, actor: AuthUser) {
     const existing = await this.prisma.user.findFirst({
       where: {
         id,
-        companyId,
+        ...(companyId ? { companyId } : {}),
       },
     });
 
     if (!existing) {
-      throw new NotFoundException('Usuário não encontrado');
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+
+    if (actor.role !== 'SUPER_ADMIN' && existing.role === 'SUPER_ADMIN') {
+      throw new ForbiddenException(
+        'Apenas SUPER_ADMIN pode desativar outro SUPER_ADMIN.',
+      );
     }
 
     return this.prisma.user.update({
-      where: { id },
+      where: { id: existing.id },
       data: {
         active: false,
       },
+      include: {
+        company: true,
+      },
+    });
+  }
+
+  async activate(id: string, companyId: string | undefined, actor: AuthUser) {
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        id,
+        ...(companyId ? { companyId } : {}),
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+
+    if (actor.role !== 'SUPER_ADMIN' && existing.role === 'SUPER_ADMIN') {
+      throw new ForbiddenException(
+        'Apenas SUPER_ADMIN pode ativar outro SUPER_ADMIN.',
+      );
+    }
+
+    return this.prisma.user.update({
+      where: { id: existing.id },
+      data: {
+        active: true,
+      },
+      include: {
+        company: true,
+      },
+    });
+  }
+
+  async hardDelete(id: string, companyId: string | undefined, actor: AuthUser) {
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        id,
+        ...(companyId ? { companyId } : {}),
+      },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+
+    if (actor.id === existing.id) {
+      throw new ForbiddenException('Você não pode excluir seu próprio usuário.');
+    }
+
+    return this.prisma.user.delete({
+      where: { id: existing.id },
     });
   }
 }

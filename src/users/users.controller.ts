@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -16,72 +17,115 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
+type AuthUser = {
+  id: string;
+  email: string;
+  role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+  companyId?: string | null;
+};
+
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post()
-  @Roles('SUPER_ADMIN')
-  createGlobal(@Body() body: CreateUserDto) {
-    return this.usersService.createGlobal(body);
-  }
+  private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
+    if (user.role === 'SUPER_ADMIN') {
+      return requestedCompanyId;
+    }
 
-  @Post('company')
-  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  createForCompany(@Req() req: any, @Body() body: CreateUserDto) {
-    return this.usersService.createForCompany(req.user.companyId, body);
+    return user.companyId ?? undefined;
   }
 
   @Get()
-  @Roles('SUPER_ADMIN')
-  findAllGlobal() {
-    return this.usersService.findAllGlobal();
-  }
-
-  @Get('company')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  findAllCompany(@Req() req: any) {
-    return this.usersService.findAllByCompany(req.user.companyId);
-  }
+  findAll(@Req() req: any, @Query('companyId') companyId?: string) {
+    const user = req.user as AuthUser;
+    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
-  @Get('company/:id')
-  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  findOneCompany(@Req() req: any, @Param('id') id: string) {
-    return this.usersService.findOneByCompany(req.user.companyId, id);
+    return this.usersService.findAll(resolvedCompanyId);
   }
 
   @Get(':id')
-  @Roles('SUPER_ADMIN')
-  findOneGlobal(@Param('id') id: string) {
-    return this.usersService.findOneGlobal(id);
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  findOne(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Query('companyId') companyId?: string,
+  ) {
+    const user = req.user as AuthUser;
+    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+
+    return this.usersService.findOne(id, resolvedCompanyId);
+  }
+
+  @Post()
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  create(@Req() req: any, @Body() body: CreateUserDto) {
+    const user = req.user as AuthUser;
+
+    const resolvedCompanyId =
+      user.role === 'SUPER_ADMIN'
+        ? body.companyId
+        : (user.companyId ?? undefined);
+
+    return this.usersService.create(resolvedCompanyId, body, user.role);
   }
 
   @Patch(':id')
-  @Roles('SUPER_ADMIN')
-  updateGlobal(@Param('id') id: string, @Body() body: UpdateUserDto) {
-    return this.usersService.updateGlobal(id, body);
-  }
-
-  @Patch('company/:id')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  updateCompany(
+  update(
     @Req() req: any,
     @Param('id') id: string,
     @Body() body: UpdateUserDto,
+    @Query('companyId') companyId?: string,
   ) {
-    return this.usersService.updateByCompany(req.user.companyId, id, body);
+    const user = req.user as AuthUser;
+
+    const resolvedCompanyId =
+      user.role === 'SUPER_ADMIN'
+        ? body.companyId ?? companyId
+        : (user.companyId ?? undefined);
+
+    return this.usersService.update(id, resolvedCompanyId, body, user);
+  }
+
+  @Patch(':id/deactivate')
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  deactivate(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Query('companyId') companyId?: string,
+  ) {
+    const user = req.user as AuthUser;
+    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+
+    return this.usersService.deactivate(id, resolvedCompanyId, user);
+  }
+
+  @Patch(':id/activate')
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  activate(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Query('companyId') companyId?: string,
+  ) {
+    const user = req.user as AuthUser;
+    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+
+    return this.usersService.activate(id, resolvedCompanyId, user);
   }
 
   @Delete(':id')
   @Roles('SUPER_ADMIN')
-  removeGlobal(@Param('id') id: string) {
-    return this.usersService.removeGlobal(id);
-  }
+  hardDelete(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Query('companyId') companyId?: string,
+  ) {
+    const user = req.user as AuthUser;
+    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
-  @Delete('company/:id')
-  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  removeCompany(@Req() req: any, @Param('id') id: string) {
-    return this.usersService.removeByCompany(req.user.companyId, id);
+    return this.usersService.hardDelete(id, resolvedCompanyId, user);
   }
 }
