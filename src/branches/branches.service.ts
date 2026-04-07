@@ -5,7 +5,7 @@ import { UpdateBranchDto } from './dto/update-branch.dto';
 
 @Injectable()
 export class BranchesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   create(companyId: string, data: CreateBranchDto) {
     return this.prisma.branch.create({
@@ -16,13 +16,15 @@ export class BranchesService {
     });
   }
 
-  findAll(companyId: string) {
+  findAll(companyId?: string) {
     return this.prisma.branch.findMany({
-      where: {
-        companyId,
-        active: true,
+      where: companyId ? { companyId } : undefined,
+      include: {
+        company: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
   }
 

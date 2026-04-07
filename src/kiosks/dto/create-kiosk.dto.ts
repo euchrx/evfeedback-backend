@@ -1,13 +1,8 @@
-import { IsOptional, IsString } from 'class-validator';
-
 export class CreateKioskDto {
-  @IsString()
   name: string;
-
-  @IsString()
+  token: string;
   branchId: string;
-
-  @IsOptional()
-  @IsString()
   locationDescription?: string;
+  active?: boolean;
+  companyId?: string;
 }
