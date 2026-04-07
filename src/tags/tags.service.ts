@@ -7,27 +7,35 @@ import { PrismaService } from '../prisma/prisma.service';
 
 type CreateTagInput = {
   name: string;
-  type?: string | null;
+  color?: string | null;
   active?: boolean;
   companyId?: string;
 };
 
 type UpdateTagInput = {
   name?: string;
-  type?: string | null;
+  color?: string | null;
   active?: boolean;
   companyId?: string;
 };
 
 @Injectable()
 export class TagsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(companyId?: string, active?: boolean) {
     return this.prisma.tag.findMany({
       where: {
         ...(companyId ? { companyId } : {}),
         ...(active !== undefined ? { active } : {}),
+      },
+      include: {
+        company: true,
+        _count: {
+          select: {
+            items: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -75,13 +83,15 @@ export class TagsService {
     });
 
     if (existing) {
-      throw new BadRequestException('Já existe uma tag com esse nome nesta empresa.');
+      throw new BadRequestException(
+        'Já existe uma tag com esse nome nesta empresa.',
+      );
     }
 
     return this.prisma.tag.create({
       data: {
         name: data.name.trim(),
-        type: data.type?.trim() || null,
+        color: data.color?.trim() || null,
         active: data.active ?? true,
         companyId: data.companyId,
       },
@@ -134,7 +144,7 @@ export class TagsService {
       },
       data: {
         ...(data.name !== undefined ? { name: data.name.trim() } : {}),
-        ...(data.type !== undefined ? { type: data.type?.trim() || null } : {}),
+        ...(data.color !== undefined ? { color: data.color?.trim() || null } : {}),
         ...(data.active !== undefined ? { active: data.active } : {}),
       },
       include: {
