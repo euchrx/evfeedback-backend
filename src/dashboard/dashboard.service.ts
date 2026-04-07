@@ -1,8 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 type DashboardFilters = {
-  companyId?: string;
   dateFrom?: string;
   dateTo?: string;
 };
@@ -31,20 +30,22 @@ export class DashboardService {
     return createdAt;
   }
 
-  async getSummary(filters?: DashboardFilters) {
+  async getSummary(companyId?: string, filters?: DashboardFilters) {
+    if (!companyId) {
+      throw new BadRequestException('companyId é obrigatório.');
+    }
+
     const createdAt = this.buildDateRange(filters);
 
     const where: any = {
-      ...(filters?.companyId ? { companyId: filters.companyId } : {}),
+      companyId,
     };
 
     if (createdAt) {
       where.createdAt = createdAt;
     }
 
-    const total = await this.prisma.feedback.count({
-      where,
-    });
+    const total = await this.prisma.feedback.count({ where });
 
     const average = await this.prisma.feedback.aggregate({
       where,
@@ -64,7 +65,7 @@ export class DashboardService {
     const feedbackTags = await this.prisma.feedbackTag.findMany({
       where: {
         feedback: {
-          ...(filters?.companyId ? { companyId: filters.companyId } : {}),
+          companyId,
           ...(createdAt ? { createdAt } : {}),
         },
       },
@@ -85,9 +86,9 @@ export class DashboardService {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    const ratings = (Array.isArray(ratingsRaw) ? ratingsRaw : []).map((item) => ({
-      rating: item.rating,
-      count: item._count.rating,
+    const ratings = (Array.isArray(ratingsRaw) ? ratingsRaw : []).map((r) => ({
+      rating: r.rating,
+      count: r._count.rating,
     }));
 
     return {
@@ -98,23 +99,20 @@ export class DashboardService {
     };
   }
 
-  async getByBranch(filters?: DashboardFilters) {
+  async getByBranch(companyId?: string, filters?: DashboardFilters) {
+    if (!companyId) {
+      throw new BadRequestException('companyId é obrigatório.');
+    }
+
     const createdAt = this.buildDateRange(filters);
 
     const branches = await this.prisma.branch.findMany({
       where: {
-        ...(filters?.companyId ? { companyId: filters.companyId } : {}),
+        companyId,
       },
       select: {
         id: true,
         name: true,
-        companyId: true,
-        company: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
         feedbacks: {
           where: createdAt ? { createdAt } : undefined,
           select: {
@@ -129,6 +127,7 @@ export class DashboardService {
 
     return branches.map((branch) => {
       const total = branch.feedbacks.length;
+
       const averageRating =
         total > 0
           ? branch.feedbacks.reduce((sum, item) => sum + item.rating, 0) / total
@@ -137,8 +136,6 @@ export class DashboardService {
       return {
         id: branch.id,
         name: branch.name,
-        companyId: branch.companyId,
-        company: branch.company,
         totalFeedbacks: total,
         averageRating: Number(averageRating.toFixed(1)),
       };

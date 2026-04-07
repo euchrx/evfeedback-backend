@@ -22,6 +22,20 @@ type AuthUser = {
   companyId?: string | null;
 };
 
+type CreateTagBody = {
+  name: string;
+  color?: string | null;
+  active?: boolean;
+  companyId?: string;
+};
+
+type UpdateTagBody = {
+  name?: string;
+  color?: string | null;
+  active?: boolean;
+  companyId?: string;
+};
+
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('tags')
 export class TagsController {
@@ -37,11 +51,18 @@ export class TagsController {
 
   @Get()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
-  findAll(@Req() req: any, @Query('companyId') companyId?: string) {
+  findAll(
+    @Req() req: any,
+    @Query('companyId') companyId?: string,
+    @Query('active') active?: string,
+  ) {
     const user = req.user as AuthUser;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
-    return this.tagsService.findAll(resolvedCompanyId);
+    const parsedActive =
+      active === undefined ? undefined : active === 'true';
+
+    return this.tagsService.findAll(resolvedCompanyId, parsedActive);
   }
 
   @Get(':id')
@@ -59,16 +80,7 @@ export class TagsController {
 
   @Post()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  create(
-    @Req() req: any,
-    @Body()
-    body: {
-      name: string;
-      color?: string;
-      companyId?: string;
-      active?: boolean;
-    },
-  ) {
+  create(@Req() req: any, @Body() body: CreateTagBody) {
     const user = req.user as AuthUser;
 
     const resolvedCompanyId =
@@ -89,13 +101,7 @@ export class TagsController {
   update(
     @Req() req: any,
     @Param('id') id: string,
-    @Body()
-    body: {
-      name?: string;
-      color?: string;
-      active?: boolean;
-      companyId?: string;
-    },
+    @Body() body: UpdateTagBody,
     @Query('companyId') companyId?: string,
   ) {
     const user = req.user as AuthUser;

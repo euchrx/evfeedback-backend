@@ -3,8 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { randomUUID } from 'crypto';
+import { PrismaService } from '../prisma/prisma.service';
 
 type CreateKioskInput = {
   name: string;
@@ -26,20 +26,24 @@ type UpdateKioskInput = {
 export class KiosksService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(companyId?: string) {
-    return this.prisma.kiosk.findMany({
-      where: companyId ? { companyId } : undefined,
-      include: {
-        company: true,
-        branch: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
+  private async validateBranchCompany(branchId: string, companyId: string) {
+    const branch = await this.prisma.branch.findFirst({
+      where: {
+        id: branchId,
+        companyId,
       },
     });
+
+    if (!branch) {
+      throw new BadRequestException(
+        'A filial informada não pertence à empresa selecionada.',
+      );
+    }
+
+    return branch;
   }
 
-  async findOne(id: string, companyId?: string) {
+  private async findScopedKiosk(id: string, companyId?: string) {
     const kiosk = await this.prisma.kiosk.findFirst({
       where: {
         id,
@@ -71,18 +75,7 @@ export class KiosksService {
       throw new BadRequestException('companyId é obrigatório.');
     }
 
-    const branch = await this.prisma.branch.findFirst({
-      where: {
-        id: data.branchId,
-        companyId: data.companyId,
-      },
-    });
-
-    if (!branch) {
-      throw new NotFoundException(
-        'Filial não encontrada para a empresa informada.',
-      );
-    }
+    await this.validateBranchCompany(data.branchId, data.companyId);
 
     return this.prisma.kiosk.create({
       data: {
@@ -100,39 +93,32 @@ export class KiosksService {
     });
   }
 
-  async update(
-    id: string,
-    companyId: string | undefined,
-    data: UpdateKioskInput,
-  ) {
-    const existing = await this.prisma.kiosk.findFirst({
+  async findAll(companyId?: string) {
+    return this.prisma.kiosk.findMany({
       where: {
-        id,
         ...(companyId ? { companyId } : {}),
       },
+      include: {
+        company: true,
+        branch: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
     });
+  }
 
-    if (!existing) {
-      throw new NotFoundException('Kiosk não encontrado.');
-    }
+  async findOne(id: string, companyId?: string) {
+    return this.findScopedKiosk(id, companyId);
+  }
 
-    const targetCompanyId = companyId ?? existing.companyId;
-    const targetBranchId = data.branchId ?? existing.branchId;
+  async update(id: string, companyId: string | undefined, data: UpdateKioskInput) {
+    const existing = await this.findScopedKiosk(id, companyId);
 
-    if (data.branchId || companyId) {
-      const branch = await this.prisma.branch.findFirst({
-        where: {
-          id: targetBranchId,
-          companyId: targetCompanyId,
-        },
-      });
+    const nextCompanyId = companyId ?? existing.companyId;
+    const nextBranchId = data.branchId ?? existing.branchId;
 
-      if (!branch) {
-        throw new NotFoundException(
-          'Filial não encontrada para a empresa informada.',
-        );
-      }
-    }
+    await this.validateBranchCompany(nextBranchId, nextCompanyId);
 
     return this.prisma.kiosk.update({
       where: {
@@ -154,16 +140,7 @@ export class KiosksService {
   }
 
   async deactivate(id: string, companyId?: string) {
-    const existing = await this.prisma.kiosk.findFirst({
-      where: {
-        id,
-        ...(companyId ? { companyId } : {}),
-      },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kiosk não encontrado.');
-    }
+    const existing = await this.findScopedKiosk(id, companyId);
 
     return this.prisma.kiosk.update({
       where: {
@@ -180,16 +157,7 @@ export class KiosksService {
   }
 
   async activate(id: string, companyId?: string) {
-    const existing = await this.prisma.kiosk.findFirst({
-      where: {
-        id,
-        ...(companyId ? { companyId } : {}),
-      },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kiosk não encontrado.');
-    }
+    const existing = await this.findScopedKiosk(id, companyId);
 
     return this.prisma.kiosk.update({
       where: {
@@ -206,16 +174,7 @@ export class KiosksService {
   }
 
   async regenerateToken(id: string, companyId?: string) {
-    const existing = await this.prisma.kiosk.findFirst({
-      where: {
-        id,
-        ...(companyId ? { companyId } : {}),
-      },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kiosk não encontrado.');
-    }
+    const existing = await this.findScopedKiosk(id, companyId);
 
     return this.prisma.kiosk.update({
       where: {
@@ -232,16 +191,7 @@ export class KiosksService {
   }
 
   async hardDelete(id: string, companyId?: string) {
-    const existing = await this.prisma.kiosk.findFirst({
-      where: {
-        id,
-        ...(companyId ? { companyId } : {}),
-      },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Kiosk não encontrado.');
-    }
+    const existing = await this.findScopedKiosk(id, companyId);
 
     return this.prisma.kiosk.delete({
       where: {
@@ -254,8 +204,8 @@ export class KiosksService {
     return this.prisma.kiosk.findUnique({
       where: { token },
       include: {
-        branch: true,
         company: true,
+        branch: true,
       },
     });
   }

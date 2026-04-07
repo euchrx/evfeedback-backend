@@ -41,8 +41,7 @@ export class DashboardController {
     const user = req.user as AuthUser;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
-    return this.service.getSummary({
-      companyId: resolvedCompanyId,
+    return this.service.getSummary(resolvedCompanyId, {
       dateFrom,
       dateTo,
     });
@@ -59,8 +58,7 @@ export class DashboardController {
     const user = req.user as AuthUser;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
-    return this.service.getByBranch({
-      companyId: resolvedCompanyId,
+    return this.service.getByBranch(resolvedCompanyId, {
       dateFrom,
       dateTo,
     });
