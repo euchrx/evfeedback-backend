@@ -2,6 +2,6 @@ export class CreateUserDto {
   name: string;
   email: string;
   password: string;
-  role: 'ADMIN' | 'MANAGER';
+  role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
   companyId?: string;
 }

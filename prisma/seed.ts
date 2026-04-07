@@ -44,7 +44,7 @@ async function main() {
         name: "Admin Global",
         email: "admin@admin.com",
         passwordHash,
-        role: "ADMIN",
+        role: "SUPER_ADMIN",
         companyId: company.id,
         active: true,
       },

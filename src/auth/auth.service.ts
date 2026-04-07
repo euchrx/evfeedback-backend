@@ -10,35 +10,39 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async login(email: string, password: string) {
-    const user = await this.usersService.findByEmail(email);
+async login(email: string, password: string) {
+  console.log('LOGIN EMAIL:', email);
+  console.log('LOGIN PASSWORD EXISTS:', !!password);
 
-    if (!user || !user.active) {
-      throw new UnauthorizedException('Credenciais inválidas');
-    }
+  const user = await this.usersService.findByEmail(email);
 
-    const isValid = await bcrypt.compare(password, user.passwordHash);
+  if (!user) {
+    throw new UnauthorizedException('Usuário não encontrado');
+  }
 
-    if (!isValid) {
-      throw new UnauthorizedException('Credenciais inválidas');
-    }
+  const isValid = await bcrypt.compare(password, user.passwordHash);
 
-    const access_token = this.jwtService.sign({
-      sub: user.id,
+  if (!isValid) {
+    throw new UnauthorizedException('Senha inválida');
+  }
+
+  const token = this.jwtService.sign({
+    sub: user.id,
+    email: user.email,
+    role: user.role,
+    companyId: user.companyId,
+  });
+
+  return {
+    access_token: token,
+    user: {
+      id: user.id,
+      name: user.name,
       email: user.email,
       role: user.role,
       companyId: user.companyId,
-    });
-
-    return {
-      access_token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        companyId: user.companyId,
-      },
-    };
-  }
+      active: user.active,
+    },
+  };
+}
 }
