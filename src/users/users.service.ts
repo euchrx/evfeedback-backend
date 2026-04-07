@@ -1,6 +1,11 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -9,12 +14,21 @@ export class UsersService {
   constructor(private prisma: PrismaService) { }
 
   findByEmail(email: string) {
-    return this.prisma.user.findUnique({
-      where: { email },
+    return this.prisma.user.findFirst({
+      where: {
+        email,
+        active: true,
+      },
     });
   }
 
   async createGlobal(data: CreateUserDto) {
+    if (!data.companyId) {
+      throw new BadRequestException(
+        'companyId é obrigatório para criação global de usuário',
+      );
+    }
+
     const passwordHash = await bcrypt.hash(data.password, 10);
 
     return this.prisma.user.create({
@@ -23,7 +37,7 @@ export class UsersService {
         email: data.email,
         passwordHash,
         role: data.role,
-        companyId: data.companyId!,
+        companyId: data.companyId,
         active: true,
       },
       include: {
@@ -33,6 +47,12 @@ export class UsersService {
   }
 
   async createForCompany(companyId: string, data: CreateUserDto) {
+    if (data.role === UserRole.SUPER_ADMIN) {
+      throw new BadRequestException(
+        'Usuário da empresa não pode criar SUPER_ADMIN',
+      );
+    }
+
     const passwordHash = await bcrypt.hash(data.password, 10);
 
     return this.prisma.user.create({
@@ -52,6 +72,9 @@ export class UsersService {
 
   findAllGlobal() {
     return this.prisma.user.findMany({
+      where: {
+        active: true,
+      },
       include: {
         company: true,
       },
@@ -65,6 +88,7 @@ export class UsersService {
     return this.prisma.user.findMany({
       where: {
         companyId,
+        active: true,
       },
       include: {
         company: true,
@@ -97,13 +121,17 @@ export class UsersService {
   }
 
   async updateGlobal(id: string, data: UpdateUserDto) {
-    const updateData: any = {
-      name: data.name,
-      email: data.email,
-      role: data.role,
-      active: data.active,
-      companyId: data.companyId,
-    };
+    const updateData: Prisma.UserUpdateInput = {};
+
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.role !== undefined) updateData.role = data.role;
+    if (data.active !== undefined) updateData.active = data.active;
+    if (data.companyId !== undefined) {
+      updateData.company = {
+        connect: { id: data.companyId },
+      };
+    }
 
     if (data.password) {
       updateData.passwordHash = await bcrypt.hash(data.password, 10);
@@ -127,15 +155,21 @@ export class UsersService {
     });
 
     if (!existing) {
-      return null;
+      throw new NotFoundException('Usuário não encontrado');
     }
 
-    const updateData: any = {
-      name: data.name,
-      email: data.email,
-      role: data.role,
-      active: data.active,
-    };
+    if (data.role === UserRole.SUPER_ADMIN) {
+      throw new BadRequestException(
+        'Usuário da empresa não pode definir role SUPER_ADMIN',
+      );
+    }
+
+    const updateData: Prisma.UserUpdateInput = {};
+
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.role !== undefined) updateData.role = data.role;
+    if (data.active !== undefined) updateData.active = data.active;
 
     if (data.password) {
       updateData.passwordHash = await bcrypt.hash(data.password, 10);
@@ -168,7 +202,7 @@ export class UsersService {
     });
 
     if (!existing) {
-      return null;
+      throw new NotFoundException('Usuário não encontrado');
     }
 
     return this.prisma.user.update({
