@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 type DashboardFilters = {
@@ -31,14 +31,10 @@ export class DashboardService {
   }
 
   async getSummary(companyId?: string, filters?: DashboardFilters) {
-    if (!companyId) {
-      throw new BadRequestException('companyId é obrigatório.');
-    }
-
     const createdAt = this.buildDateRange(filters);
 
     const where: any = {
-      companyId,
+      ...(companyId ? { companyId } : {}),
     };
 
     if (createdAt) {
@@ -65,7 +61,7 @@ export class DashboardService {
     const feedbackTags = await this.prisma.feedbackTag.findMany({
       where: {
         feedback: {
-          companyId,
+          ...(companyId ? { companyId } : {}),
           ...(createdAt ? { createdAt } : {}),
         },
       },
@@ -86,7 +82,7 @@ export class DashboardService {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    const ratings = (Array.isArray(ratingsRaw) ? ratingsRaw : []).map((r) => ({
+    const ratings = ratingsRaw.map((r) => ({
       rating: r.rating,
       count: r._count.rating,
     }));
@@ -100,15 +96,11 @@ export class DashboardService {
   }
 
   async getByBranch(companyId?: string, filters?: DashboardFilters) {
-    if (!companyId) {
-      throw new BadRequestException('companyId é obrigatório.');
-    }
-
     const createdAt = this.buildDateRange(filters);
 
     const branches = await this.prisma.branch.findMany({
       where: {
-        companyId,
+        ...(companyId ? { companyId } : {}),
       },
       select: {
         id: true,
