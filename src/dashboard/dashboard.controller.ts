@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Get,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -24,7 +18,7 @@ export class DashboardController {
 
   private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
     if (user.role === 'SUPER_ADMIN') {
-      return requestedCompanyId;
+      return requestedCompanyId || undefined;
     }
 
     return user.companyId ?? undefined;
