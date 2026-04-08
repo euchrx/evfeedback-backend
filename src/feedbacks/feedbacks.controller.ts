@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Param,
   Query,
@@ -68,5 +69,18 @@ export class FeedbacksController {
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
     return this.feedbacksService.findOne(id, resolvedCompanyId);
+  }
+
+  @Delete(':id')
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  remove(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Query('companyId') companyId?: string,
+  ) {
+    const user = req.user as AuthUser;
+    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+
+    return this.feedbacksService.remove(id, resolvedCompanyId);
   }
 }

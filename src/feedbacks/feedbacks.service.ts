@@ -98,4 +98,30 @@ export class FeedbacksService {
 
     return feedback;
   }
+
+  async remove(id: string, companyId?: string) {
+    const feedback = await this.prisma.feedback.findFirst({
+      where: {
+        id,
+        ...(companyId ? { companyId } : {}),
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!feedback) {
+      throw new NotFoundException('Feedback não encontrado.');
+    }
+
+    await this.prisma.feedback.delete({
+      where: {
+        id,
+      },
+    });
+
+    return {
+      message: 'Feedback excluído com sucesso.',
+    };
+  }
 }
