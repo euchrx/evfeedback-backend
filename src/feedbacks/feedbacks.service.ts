@@ -6,6 +6,7 @@ type FindAllFeedbacksFilters = {
   branchId?: string;
   kioskId?: string;
   rating?: string;
+  environmentType?: string;
   startDate?: string;
   endDate?: string;
   active?: string;
@@ -36,6 +37,12 @@ export class FeedbacksService {
       if (!Number.isNaN(parsedRating)) {
         where.rating = parsedRating;
       }
+    }
+
+    if (filters.environmentType) {
+      where.kiosk = {
+        environmentType: filters.environmentType,
+      };
     }
 
     if (filters.active !== undefined && filters.active !== '') {

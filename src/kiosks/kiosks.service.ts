@@ -6,11 +6,14 @@ import {
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
+type EnvironmentType = 'POSTO' | 'CONVENIENCIA' | 'RESTAURANTE';
+
 type CreateKioskInput = {
   name: string;
   branchId: string;
   companyId?: string;
   locationDescription?: string;
+  environmentType?: EnvironmentType;
   active?: boolean;
 };
 
@@ -19,6 +22,7 @@ type UpdateKioskInput = {
   branchId?: string;
   companyId?: string;
   locationDescription?: string | null;
+  environmentType?: EnvironmentType;
   active?: boolean;
 };
 
@@ -83,6 +87,7 @@ export class KiosksService {
         branchId: data.branchId,
         companyId: data.companyId,
         locationDescription: data.locationDescription?.trim() || null,
+        environmentType: data.environmentType ?? 'POSTO',
         active: data.active ?? true,
         token: randomUUID(),
       },
@@ -129,6 +134,9 @@ export class KiosksService {
         ...(data.branchId !== undefined ? { branchId: data.branchId } : {}),
         ...(data.locationDescription !== undefined
           ? { locationDescription: data.locationDescription?.trim() || null }
+          : {}),
+        ...(data.environmentType !== undefined
+          ? { environmentType: data.environmentType }
           : {}),
         ...(data.active !== undefined ? { active: data.active } : {}),
       },

@@ -12,6 +12,12 @@ enum UserRole {
   MANAGER
 }
 
+enum EnvironmentType {
+  POSTO
+  CONVENIENCIA
+  RESTAURANTE
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -53,30 +59,32 @@ model Branch {
 }
 
 model Kiosk {
-  id                  String     @id @default(cuid())
+  id                  String          @id @default(cuid())
   name                String
-  token               String     @unique
+  token               String          @unique
   locationDescription String?
-  active              Boolean    @default(true)
+  environmentType     EnvironmentType @default(POSTO)
+  active              Boolean         @default(true)
   companyId           String
-  company             Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company             Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   branchId            String
-  branch              Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch              Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
   feedbacks           Feedback[]
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 }
 
 model Tag {
-  id        String         @id @default(uuid())
-  name      String
-  color     String?
-  active    Boolean        @default(true)
-  companyId String
-  company   Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  items     FeedbackTag[]
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id              String          @id @default(uuid())
+  name            String
+  color           String?
+  environmentType EnvironmentType @default(POSTO)
+  active          Boolean         @default(true)
+  companyId       String
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items           FeedbackTag[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 }
 
 model Feedback {

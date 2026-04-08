@@ -22,11 +22,14 @@ type AuthUser = {
   companyId?: string | null;
 };
 
+type EnvironmentType = 'POSTO' | 'CONVENIENCIA' | 'RESTAURANTE';
+
 type CreateKioskBody = {
   name: string;
   branchId: string;
   companyId?: string;
   locationDescription?: string;
+  environmentType?: EnvironmentType;
   active?: boolean;
 };
 
@@ -35,6 +38,7 @@ type UpdateKioskBody = {
   branchId?: string;
   companyId?: string;
   locationDescription?: string | null;
+  environmentType?: EnvironmentType;
   active?: boolean;
 };
 
@@ -88,6 +92,7 @@ export class KiosksController {
       branchId: body.branchId,
       companyId: resolvedCompanyId,
       locationDescription: body.locationDescription,
+      environmentType: body.environmentType,
       active: body.active,
     });
   }

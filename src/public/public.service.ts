@@ -49,6 +49,7 @@ export class PublicService {
         branchId: kiosk.branchId,
         companyId: kiosk.companyId,
         locationDescription: kiosk.locationDescription,
+        environmentType: kiosk.environmentType,
       },
       company: kiosk.company
         ? {
@@ -80,6 +81,7 @@ export class PublicService {
     return this.prisma.tag.findMany({
       where: {
         companyId: kiosk.companyId,
+        environmentType: kiosk.environmentType,
         active: true,
       },
       orderBy: {
@@ -112,6 +114,7 @@ export class PublicService {
         where: {
           id: { in: validTagIds },
           companyId: kiosk.companyId,
+          environmentType: kiosk.environmentType,
           active: true,
         },
         select: { id: true },
@@ -119,7 +122,7 @@ export class PublicService {
 
       if (tags.length !== validTagIds.length) {
         throw new BadRequestException(
-          'Uma ou mais tags informadas são inválidas para este kiosk.',
+          'Uma ou mais tags informadas são inválidas para este ambiente do kiosk.',
         );
       }
     }

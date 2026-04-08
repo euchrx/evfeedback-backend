@@ -22,9 +22,12 @@ type AuthUser = {
   companyId?: string | null;
 };
 
+type EnvironmentType = 'POSTO' | 'CONVENIENCIA' | 'RESTAURANTE';
+
 type CreateTagBody = {
   name: string;
   color?: string | null;
+  environmentType?: EnvironmentType;
   active?: boolean;
   companyId?: string;
 };
@@ -32,7 +35,13 @@ type CreateTagBody = {
 type UpdateTagBody = {
   name?: string;
   color?: string | null;
+  environmentType?: EnvironmentType;
   active?: boolean;
+  companyId?: string;
+};
+
+type ImportTagsBySegmentBody = {
+  segment: 'RESTAURANTE' | 'CONVENIENCIA' | 'POSTO';
   companyId?: string;
 };
 
@@ -91,9 +100,23 @@ export class TagsController {
     return this.tagsService.create({
       name: body.name,
       color: body.color,
+      environmentType: body.environmentType,
       active: body.active,
       companyId: resolvedCompanyId,
     });
+  }
+
+  @Post('import-by-segment')
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  importBySegment(@Req() req: any, @Body() body: ImportTagsBySegmentBody) {
+    const user = req.user as AuthUser;
+
+    const resolvedCompanyId =
+      user.role === 'SUPER_ADMIN'
+        ? body.companyId
+        : (user.companyId ?? undefined);
+
+    return this.tagsService.importBySegment(body.segment, resolvedCompanyId);
   }
 
   @Patch(':id')
