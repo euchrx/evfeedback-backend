@@ -27,7 +27,7 @@ type AuthUser = {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
     if (user.role === 'SUPER_ADMIN') {
@@ -61,15 +61,24 @@ export class UsersController {
 
   @Post()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  create(@Req() req: any, @Body() body: CreateUserDto) {
+  create(@Req() req: any, @Body() body: CreateUserBody) {
     const user = req.user as AuthUser;
 
     const resolvedCompanyId =
-      user.role === 'SUPER_ADMIN'
-        ? body.companyId
-        : (user.companyId ?? undefined);
+      body.role === 'SUPER_ADMIN'
+        ? undefined
+        : user.role === 'SUPER_ADMIN'
+          ? body.companyId
+          : (user.companyId ?? undefined);
 
-    return this.usersService.create(resolvedCompanyId, body, user.role);
+    return this.usersService.create({
+      name: body.name,
+      email: body.email,
+      password: body.password,
+      role: body.role,
+      active: body.active,
+      companyId: resolvedCompanyId,
+    });
   }
 
   @Patch(':id')
