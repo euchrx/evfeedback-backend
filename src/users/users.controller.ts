@@ -61,7 +61,7 @@ export class UsersController {
 
   @Post()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  create(@Req() req: any, @Body() body: CreateUserBody) {
+  create(@Req() req: any, @Body() body: CreateUserDto) {
     const user = req.user as AuthUser;
 
     const resolvedCompanyId =
@@ -71,14 +71,14 @@ export class UsersController {
           ? body.companyId
           : (user.companyId ?? undefined);
 
-    return this.usersService.create({
-      name: body.name,
-      email: body.email,
-      password: body.password,
-      role: body.role,
-      active: body.active,
-      companyId: resolvedCompanyId,
-    });
+    return this.usersService.create(
+      resolvedCompanyId,
+      {
+        ...body,
+        companyId: body.role === 'SUPER_ADMIN' ? undefined : resolvedCompanyId,
+      },
+      user.role,
+    );
   }
 
   @Patch(':id')
@@ -92,11 +92,21 @@ export class UsersController {
     const user = req.user as AuthUser;
 
     const resolvedCompanyId =
-      user.role === 'SUPER_ADMIN'
-        ? body.companyId ?? companyId
-        : (user.companyId ?? undefined);
+      body.role === 'SUPER_ADMIN'
+        ? undefined
+        : user.role === 'SUPER_ADMIN'
+          ? body.companyId ?? companyId
+          : (user.companyId ?? undefined);
 
-    return this.usersService.update(id, resolvedCompanyId, body, user);
+    return this.usersService.update(
+      id,
+      resolvedCompanyId,
+      {
+        ...body,
+        companyId: body.role === 'SUPER_ADMIN' ? undefined : resolvedCompanyId,
+      },
+      user,
+    );
   }
 
   @Patch(':id/deactivate')
