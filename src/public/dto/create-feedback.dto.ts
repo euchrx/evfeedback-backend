@@ -1,4 +1,13 @@
-import { IsArray, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class CreateFeedbackDto {
   @IsString()
@@ -15,6 +24,23 @@ export class CreateFeedbackDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayUnique()
   @IsString({ each: true })
   tagIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  contactName?: string;
+
+  @IsOptional()
+  @IsString()
+  contactPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  contactMessage?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  contactConsent?: boolean;
 }

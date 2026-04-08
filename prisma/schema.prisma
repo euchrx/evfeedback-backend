@@ -80,17 +80,21 @@ model Tag {
 }
 
 model Feedback {
-  id        String        @id @default(cuid())
-  rating    Int
-  comment   String?
-  companyId String
-  kioskId   String
-  branchId  String
-  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  kiosk     Kiosk         @relation(fields: [kioskId], references: [id], onDelete: Cascade)
-  branch    Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  tags      FeedbackTag[]
-  createdAt DateTime      @default(now())
+  id             String        @id @default(cuid())
+  rating         Int
+  comment        String?
+  contactName    String?
+  contactPhone   String?
+  contactMessage String?
+  contactConsent Boolean       @default(false)
+  companyId      String
+  kioskId        String
+  branchId       String
+  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  kiosk          Kiosk         @relation(fields: [kioskId], references: [id], onDelete: Cascade)
+  branch         Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  tags           FeedbackTag[]
+  createdAt      DateTime      @default(now())
 }
 
 model FeedbackTag {
