@@ -2,8 +2,8 @@ import {
   Body,
   Controller,
   Get,
-  Param,
   Patch,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -20,18 +20,21 @@ type AuthUser = {
 };
 
 type UpdateSettingsBody = {
-  companyName?: string;
-  logoUrl?: string;
-  thankYouMessage?: string;
-  primaryColor?: string;
+  companyName?: string | null;
+  logoUrl?: string | null;
+  thankYouMessage?: string | null;
+  primaryColor?: string | null;
   kioskResetSeconds?: number;
-  heroTitle?: string;
-  heroSubtitle?: string;
-  backgroundColor?: string;
-  backgroundImageUrl?: string;
-  cardBackgroundColor?: string;
-  textColor?: string;
-  buttonTextColor?: string;
+  heroTitle?: string | null;
+  heroSubtitle?: string | null;
+  backgroundColor?: string | null;
+  backgroundImageUrl?: string | null;
+  cardBackgroundColor?: string | null;
+  textColor?: string | null;
+  buttonTextColor?: string | null;
+  notificationEmails?: string | null;
+  dailyNotificationEnabled?: boolean;
+  monthlyNotificationEnabled?: boolean;
 };
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -39,34 +42,33 @@ type UpdateSettingsBody = {
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
+  private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
+    if (user.role === 'SUPER_ADMIN') {
+      return requestedCompanyId;
+    }
+
+    return user.companyId ?? undefined;
+  }
+
   @Get('me')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
-  getMine(@Req() req: any) {
+  findMySettings(@Req() req: any, @Query('companyId') companyId?: string) {
     const user = req.user as AuthUser;
+    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
-    return this.settingsService.getByCompany(user.companyId ?? undefined);
+    return this.settingsService.findByCompanyId(resolvedCompanyId);
   }
 
   @Patch('me')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  updateMine(@Req() req: any, @Body() body: UpdateSettingsBody) {
-    const user = req.user as AuthUser;
-
-    return this.settingsService.updateByCompany(user.companyId ?? undefined, body);
-  }
-
-  @Get('company/:companyId')
-  @Roles('SUPER_ADMIN')
-  getByCompany(@Param('companyId') companyId: string) {
-    return this.settingsService.getByCompany(companyId);
-  }
-
-  @Patch('company/:companyId')
-  @Roles('SUPER_ADMIN')
-  updateByCompany(
-    @Param('companyId') companyId: string,
+  updateMySettings(
+    @Req() req: any,
     @Body() body: UpdateSettingsBody,
+    @Query('companyId') companyId?: string,
   ) {
-    return this.settingsService.updateByCompany(companyId, body);
+    const user = req.user as AuthUser;
+    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+
+    return this.settingsService.upsertByCompanyId(resolvedCompanyId, body);
   }
 }

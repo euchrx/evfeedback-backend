@@ -116,21 +116,24 @@ model FeedbackTag {
 }
 
 model Setting {
-  id                  String   @id @default(cuid())
-  companyId           String   @unique
-  company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  companyName         String?
-  logoUrl             String?
-  thankYouMessage     String?
-  primaryColor        String?
-  kioskResetSeconds   Int      @default(5)
-  heroTitle           String?
-  heroSubtitle        String?
-  backgroundColor     String?
-  backgroundImageUrl  String?
-  cardBackgroundColor String?
-  textColor           String?
-  buttonTextColor     String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                        String   @id @default(cuid())
+  companyId                 String   @unique
+  company                   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyName               String?
+  logoUrl                   String?
+  thankYouMessage           String?
+  primaryColor              String?
+  kioskResetSeconds         Int      @default(5)
+  heroTitle                 String?
+  heroSubtitle              String?
+  backgroundColor           String?
+  backgroundImageUrl        String?
+  cardBackgroundColor       String?
+  textColor                 String?
+  buttonTextColor           String?
+  notificationEmails        String?
+  dailyNotificationEnabled  Boolean  @default(true)
+  monthlyNotificationEnabled Boolean @default(true)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 }
