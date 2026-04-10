@@ -51,6 +51,9 @@ export class NotificationsService {
         user,
         pass,
       },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
     });
   }
 
