@@ -76,7 +76,7 @@ export class SettingsController {
   }
 
   @Post('test-email')
-  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  @Roles('SUPER_ADMIN')
   async sendTestEmail(
     @Req() req: any,
     @Query('companyId') companyId?: string,

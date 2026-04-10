@@ -87,11 +87,91 @@ export class DashboardService {
       count: r._count.rating,
     }));
 
+    const byEnvironmentRaw = await this.prisma.kiosk.findMany({
+      where: {
+        ...(companyId ? { companyId } : {}),
+      },
+      select: {
+        environmentType: true,
+        feedbacks: {
+          where: createdAt ? { createdAt } : undefined,
+          select: {
+            rating: true,
+          },
+        },
+      },
+    });
+
+    const environmentMap = new Map<
+      'POSTO' | 'CONVENIENCIA' | 'RESTAURANTE',
+      { total: number; ratingSum: number }
+    >();
+
+    for (const item of byEnvironmentRaw) {
+      const current = environmentMap.get(item.environmentType) ?? {
+        total: 0,
+        ratingSum: 0,
+      };
+
+      for (const feedback of item.feedbacks) {
+        current.total += 1;
+        current.ratingSum += feedback.rating;
+      }
+
+      environmentMap.set(item.environmentType, current);
+    }
+
+    const byEnvironment = ['POSTO', 'CONVENIENCIA', 'RESTAURANTE'].map(
+      (environmentType) => {
+        const data = environmentMap.get(
+          environmentType as 'POSTO' | 'CONVENIENCIA' | 'RESTAURANTE',
+        ) ?? {
+          total: 0,
+          ratingSum: 0,
+        };
+
+        return {
+          environmentType,
+          total: data.total,
+          averageRating:
+            data.total > 0 ? Number((data.ratingSum / data.total).toFixed(1)) : 0,
+        };
+      },
+    );
+
+    const recentFeedbacks = await this.prisma.feedback.findMany({
+      where,
+      include: {
+        branch: true,
+        kiosk: true,
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 10,
+    });
+
     return {
       total,
       averageRating: average._avg.rating ?? 0,
       ratings,
       topTags,
+      byEnvironment,
+      recentFeedbacks: recentFeedbacks.map((item) => ({
+        id: item.id,
+        rating: item.rating,
+        comment: item.comment,
+        createdAt: item.createdAt,
+        branchName: item.branch?.name ?? null,
+        kioskName: item.kiosk?.name ?? null,
+        environmentType: item.kiosk?.environmentType ?? null,
+        tags: item.tags.map((tag) => tag.tag?.name).filter(Boolean),
+      })),
     };
   }
 
