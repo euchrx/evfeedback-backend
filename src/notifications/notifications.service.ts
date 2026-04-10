@@ -30,7 +30,7 @@ type FeedbackWithRelations = {
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   private getTransporter() {
     const host = process.env.SMTP_HOST;
@@ -150,8 +150,8 @@ export class NotificationsService {
     const average =
       total > 0
         ? (
-            feedbacks.reduce((sum, item) => sum + item.rating, 0) / total
-          ).toFixed(2)
+          feedbacks.reduce((sum, item) => sum + item.rating, 0) / total
+        ).toFixed(2)
         : '0.00';
 
     const byEnvironment = feedbacks.reduce<Record<string, number>>((acc, item) => {
@@ -195,6 +195,53 @@ export class NotificationsService {
       subject,
       html,
     });
+  }
+
+  async sendTestEmail(companyId: string) {
+    const transporter = this.getTransporter();
+
+    if (!transporter) {
+      throw new Error('SMTP não configurado.');
+    }
+
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      include: {
+        setting: true,
+      },
+    });
+
+    if (!company) {
+      throw new Error('Empresa não encontrada.');
+    }
+
+    const recipients = this.getRecipients(company.setting?.notificationEmails);
+
+    if (recipients.length === 0) {
+      throw new Error('Nenhum e-mail de notificação configurado para esta empresa.');
+    }
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: recipients.join(','),
+      subject: `Teste de envio - ${company.name}`,
+      html: `
+      <div style="font-family:Arial,sans-serif;color:#111;">
+        <h2>Teste de e-mail do EvFeedback</h2>
+        <p>Este é um envio de teste das notificações.</p>
+        <p><strong>Empresa:</strong> ${company.name}</p>
+        <p><strong>Data:</strong> ${new Date().toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+      })}</p>
+        <p>Se você recebeu esta mensagem, a configuração de SMTP está funcionando.</p>
+      </div>
+    `,
+    });
+
+    return {
+      message: 'E-mail de teste enviado com sucesso.',
+      recipients,
+    };
   }
 
   @Cron('0 7 * * *', {
