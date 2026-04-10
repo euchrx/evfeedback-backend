@@ -39,6 +39,14 @@ export class NotificationsService {
     const pass = process.env.SMTP_PASS;
     const secure = process.env.SMTP_SECURE === 'true';
 
+    console.log('SMTP CONFIG', {
+      host,
+      port,
+      user,
+      secure,
+      hasPass: !!pass,
+    });
+
     if (!host || !user || !pass) {
       return null;
     }
@@ -51,6 +59,7 @@ export class NotificationsService {
         user,
         pass,
       },
+      family: 4,
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 10000,
