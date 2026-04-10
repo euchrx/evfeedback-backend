@@ -21,7 +21,7 @@ type UpdateSettingsInput = {
 
 @Injectable()
 export class SettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async findByCompanyId(companyId?: string) {
     if (!companyId) {
@@ -51,7 +51,7 @@ export class SettingsService {
     }
 
     const emails = value
-      .split(',')
+      .split(/[\n,;]+/)
       .map((item) => item.trim().toLowerCase())
       .filter(Boolean);
 
