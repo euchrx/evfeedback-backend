@@ -71,7 +71,7 @@ export class KiosksController {
 
     return this.kiosksService.create(resolvedCompanyId, {
       ...body,
-      companyId: resolvedCompanyId!,
+      companyId: resolvedCompanyId,
     });
   }
 
@@ -87,17 +87,15 @@ export class KiosksController {
 
     const resolvedCompanyId =
       user.role === 'SUPER_ADMIN'
-        ? body.companyId ?? companyId
+        ? (body.companyId ?? companyId)
         : (user.companyId ?? undefined);
 
-    return this.kiosksService.update(
-      id,
-      resolvedCompanyId,
-      {
-        ...body,
-        ...(resolvedCompanyId !== undefined ? { companyId: resolvedCompanyId } : {}),
-      },
-    );
+    return this.kiosksService.update(id, resolvedCompanyId, {
+      ...body,
+      ...(resolvedCompanyId !== undefined
+        ? { companyId: resolvedCompanyId }
+        : {}),
+    });
   }
 
   @Patch(':id/deactivate')

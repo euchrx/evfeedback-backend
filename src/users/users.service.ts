@@ -87,7 +87,7 @@ export class UsersService {
     const normalizedEmail = data.email.trim().toLowerCase();
 
     const targetCompanyId =
-      data.role === 'SUPER_ADMIN' ? null : companyId ?? null;
+      data.role === 'SUPER_ADMIN' ? null : (companyId ?? null);
 
     if (data.role !== 'SUPER_ADMIN' && !targetCompanyId) {
       throw new BadRequestException(
@@ -311,7 +311,9 @@ export class UsersService {
     }
 
     if (actor.id === existing.id) {
-      throw new ForbiddenException('Você não pode excluir seu próprio usuário.');
+      throw new ForbiddenException(
+        'Você não pode excluir seu próprio usuário.',
+      );
     }
 
     return this.prisma.user.delete({

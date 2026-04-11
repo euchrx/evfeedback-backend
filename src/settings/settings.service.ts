@@ -1,5 +1,12 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { extname, join } from 'node:path';
 
 type UpdateSettingsInput = {
   companyName?: string | null;
@@ -19,9 +26,28 @@ type UpdateSettingsInput = {
   monthlyNotificationEnabled?: boolean;
 };
 
+type ApkMetadata = {
+  originalName: string;
+  storedName: string;
+  contentType: string;
+  size: number;
+  uploadedAt: string;
+};
+
+export type UploadedApkFile = {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+};
+
 @Injectable()
 export class SettingsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
+
+  private readonly apkDirectory = join(process.cwd(), 'storage', 'apk');
+  private readonly apkFileName = 'evfeedback-latest.apk';
+  private readonly apkMetadataFile = join(this.apkDirectory, 'metadata.json');
 
   async findByCompanyId(companyId?: string) {
     if (!companyId) {
@@ -68,7 +94,10 @@ export class SettingsService {
     return uniqueEmails.join(', ');
   }
 
-  async upsertByCompanyId(companyId: string | undefined, data: UpdateSettingsInput) {
+  async upsertByCompanyId(
+    companyId: string | undefined,
+    data: UpdateSettingsInput,
+  ) {
     if (!companyId) {
       throw new BadRequestException('companyId é obrigatório.');
     }
@@ -148,5 +177,110 @@ export class SettingsService {
           : {}),
       },
     });
+  }
+
+  private async ensureApkDirectory() {
+    await mkdir(this.apkDirectory, { recursive: true });
+  }
+
+  private getApkFilePath() {
+    return join(this.apkDirectory, this.apkFileName);
+  }
+
+  private async readApkMetadata(): Promise<ApkMetadata | null> {
+    if (!existsSync(this.apkMetadataFile)) {
+      return null;
+    }
+
+    try {
+      const content = await readFile(this.apkMetadataFile, 'utf-8');
+      return JSON.parse(content) as ApkMetadata;
+    } catch {
+      return null;
+    }
+  }
+
+  async getLatestApkInfo(baseUrl?: string) {
+    const filePath = this.getApkFilePath();
+    const metadata = await this.readApkMetadata();
+
+    if (!metadata || !existsSync(filePath)) {
+      return null;
+    }
+
+    const fileStats = await stat(filePath);
+    const downloadPath = '/downloads/app/latest';
+
+    return {
+      originalName: metadata.originalName,
+      storedName: metadata.storedName,
+      contentType: metadata.contentType,
+      size: fileStats.size,
+      uploadedAt: metadata.uploadedAt,
+      downloadPath,
+      downloadUrl: baseUrl ? `${baseUrl}${downloadPath}` : downloadPath,
+    };
+  }
+
+  async saveLatestApk(file: UploadedApkFile | undefined, baseUrl?: string) {
+    if (!file) {
+      throw new BadRequestException('Envie um arquivo APK.');
+    }
+
+    const fileName = file.originalname?.trim() || '';
+
+    if (
+      !fileName.toLowerCase().endsWith('.apk') ||
+      extname(fileName).toLowerCase() !== '.apk'
+    ) {
+      throw new BadRequestException(
+        'O arquivo enviado deve ter extensão .apk.',
+      );
+    }
+
+    if (!file.buffer?.length) {
+      throw new BadRequestException('O arquivo APK enviado está vazio.');
+    }
+
+    await this.ensureApkDirectory();
+
+    const filePath = this.getApkFilePath();
+    if (existsSync(filePath)) {
+      await unlink(filePath);
+    }
+
+    await writeFile(filePath, file.buffer);
+
+    const metadata: ApkMetadata = {
+      originalName: fileName,
+      storedName: this.apkFileName,
+      contentType: file.mimetype || 'application/vnd.android.package-archive',
+      size: file.size ?? file.buffer.length,
+      uploadedAt: new Date().toISOString(),
+    };
+
+    await writeFile(
+      this.apkMetadataFile,
+      JSON.stringify(metadata, null, 2),
+      'utf-8',
+    );
+
+    return this.getLatestApkInfo(baseUrl);
+  }
+
+  async getLatestApkFile() {
+    const filePath = this.getApkFilePath();
+    const metadata = await this.readApkMetadata();
+
+    if (!metadata || !existsSync(filePath)) {
+      throw new NotFoundException('Nenhum APK foi enviado ainda.');
+    }
+
+    return {
+      path: filePath,
+      contentType:
+        metadata.contentType || 'application/vnd.android.package-archive',
+      downloadName: metadata.originalName || this.apkFileName,
+    };
   }
 }

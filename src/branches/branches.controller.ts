@@ -101,7 +101,7 @@ export class BranchesController {
 
     const resolvedCompanyId =
       user.role === 'SUPER_ADMIN'
-        ? body.companyId ?? companyId
+        ? (body.companyId ?? companyId)
         : (user.companyId ?? undefined);
 
     return this.branchesService.update(id, resolvedCompanyId, body);

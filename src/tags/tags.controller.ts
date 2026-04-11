@@ -71,7 +71,7 @@ export class TagsController {
 
     return this.tagsService.create(resolvedCompanyId, {
       ...body,
-      companyId: resolvedCompanyId!,
+      companyId: resolvedCompanyId,
     });
   }
 
@@ -87,17 +87,15 @@ export class TagsController {
 
     const resolvedCompanyId =
       user.role === 'SUPER_ADMIN'
-        ? body.companyId ?? companyId
+        ? (body.companyId ?? companyId)
         : (user.companyId ?? undefined);
 
-    return this.tagsService.update(
-      id,
-      resolvedCompanyId,
-      {
-        ...body,
-        ...(resolvedCompanyId !== undefined ? { companyId: resolvedCompanyId } : {}),
-      },
-    );
+    return this.tagsService.update(id, resolvedCompanyId, {
+      ...body,
+      ...(resolvedCompanyId !== undefined
+        ? { companyId: resolvedCompanyId }
+        : {}),
+    });
   }
 
   @Patch(':id/deactivate')

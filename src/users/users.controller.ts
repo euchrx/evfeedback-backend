@@ -95,7 +95,7 @@ export class UsersController {
       body.role === 'SUPER_ADMIN'
         ? undefined
         : user.role === 'SUPER_ADMIN'
-          ? body.companyId ?? companyId
+          ? (body.companyId ?? companyId)
           : (user.companyId ?? undefined);
 
     return this.usersService.update(

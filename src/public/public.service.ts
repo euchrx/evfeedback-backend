@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { KiosksService } from '../kiosks/kiosks.service';
+import { SettingsService } from '../settings/settings.service';
 
 type CreatePublicFeedbackInput = {
   token: string;
@@ -22,6 +23,7 @@ export class PublicService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly kiosksService: KiosksService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async getKioskConfig(token: string) {
@@ -159,5 +161,15 @@ export class PublicService {
         },
       },
     });
+  }
+
+  async getLatestAppApk() {
+    const apk = await this.settingsService.getLatestApkFile();
+
+    if (!apk) {
+      throw new NotFoundException('APK não encontrado.');
+    }
+
+    return apk;
   }
 }

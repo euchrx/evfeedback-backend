@@ -158,10 +158,7 @@ export class NotificationsService {
     }, {});
 
     const branchHtml = Object.entries(byBranch)
-      .map(
-        ([branch, count]) =>
-          `<li><strong>${branch}:</strong> ${count}</li>`,
-      )
+      .map(([branch, count]) => `<li><strong>${branch}:</strong> ${count}</li>`)
       .join('');
 
     return `

@@ -10,7 +10,7 @@ import { UpdateKioskDto } from './dto/update-kiosk.dto';
 
 @Injectable()
 export class KiosksService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(companyId?: string) {
     return this.prisma.kiosk.findMany({
@@ -75,7 +75,9 @@ export class KiosksService {
     });
 
     if (!branch) {
-      throw new NotFoundException('Filial não encontrada para a empresa informada.');
+      throw new NotFoundException(
+        'Filial não encontrada para a empresa informada.',
+      );
     }
 
     return this.prisma.kiosk.create({
@@ -94,7 +96,11 @@ export class KiosksService {
     });
   }
 
-  async update(id: string, companyId: string | undefined, data: UpdateKioskDto) {
+  async update(
+    id: string,
+    companyId: string | undefined,
+    data: UpdateKioskDto,
+  ) {
     const existing = await this.prisma.kiosk.findFirst({
       where: {
         id,
@@ -136,7 +142,9 @@ export class KiosksService {
       });
 
       if (!branch) {
-        throw new NotFoundException('Filial não encontrada para a empresa informada.');
+        throw new NotFoundException(
+          'Filial não encontrada para a empresa informada.',
+        );
       }
     }
 
