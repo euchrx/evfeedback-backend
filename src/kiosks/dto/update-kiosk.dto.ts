@@ -1,18 +1,21 @@
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
-export class CreateKioskDto {
+export class UpdateKioskDto {
+  @IsOptional()
   @IsString()
-  name: string;
+  name?: string;
 
   @IsOptional()
   @IsString()
   locationDescription?: string;
 
+  @IsOptional()
   @IsString()
-  companyId: string;
+  companyId?: string;
 
+  @IsOptional()
   @IsString()
-  branchId: string;
+  branchId?: string;
 
   @IsOptional()
   @IsBoolean()

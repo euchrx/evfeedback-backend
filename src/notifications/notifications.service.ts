@@ -14,7 +14,6 @@ type FeedbackWithRelations = {
   contactConsent: boolean;
   kiosk: {
     name: string;
-    environmentType: 'POSTO' | 'CONVENIENCIA' | 'RESTAURANTE';
   };
   branch: {
     name: string;
@@ -66,21 +65,6 @@ export class NotificationsService {
       .filter(Boolean);
   }
 
-  private getEnvironmentLabel(
-    environment: 'POSTO' | 'CONVENIENCIA' | 'RESTAURANTE',
-  ) {
-    switch (environment) {
-      case 'POSTO':
-        return 'Posto';
-      case 'CONVENIENCIA':
-        return 'Conveniência';
-      case 'RESTAURANTE':
-        return 'Restaurante';
-      default:
-        return environment;
-    }
-  }
-
   private getRatingLabel(rating: number) {
     switch (rating) {
       case 1:
@@ -121,7 +105,6 @@ export class NotificationsService {
             <td style="padding:8px;border:1px solid #ddd;">${this.formatDate(feedback.createdAt)}</td>
             <td style="padding:8px;border:1px solid #ddd;">${feedback.branch?.name ?? '-'}</td>
             <td style="padding:8px;border:1px solid #ddd;">${feedback.kiosk?.name ?? '-'}</td>
-            <td style="padding:8px;border:1px solid #ddd;">${this.getEnvironmentLabel(feedback.kiosk.environmentType)}</td>
             <td style="padding:8px;border:1px solid #ddd;">${this.getRatingLabel(feedback.rating)}</td>
             <td style="padding:8px;border:1px solid #ddd;">${feedback.comment ?? 'Sem comentário'}</td>
             <td style="padding:8px;border:1px solid #ddd;">${tags}</td>
@@ -143,7 +126,6 @@ export class NotificationsService {
               <th style="padding:8px;border:1px solid #ddd;text-align:left;">Data</th>
               <th style="padding:8px;border:1px solid #ddd;text-align:left;">Filial</th>
               <th style="padding:8px;border:1px solid #ddd;text-align:left;">Kiosk</th>
-              <th style="padding:8px;border:1px solid #ddd;text-align:left;">Ambiente</th>
               <th style="padding:8px;border:1px solid #ddd;text-align:left;">Nota</th>
               <th style="padding:8px;border:1px solid #ddd;text-align:left;">Comentário</th>
               <th style="padding:8px;border:1px solid #ddd;text-align:left;">Tags</th>
@@ -169,19 +151,16 @@ export class NotificationsService {
           ).toFixed(2)
         : '0.00';
 
-    const byEnvironment = feedbacks.reduce<Record<string, number>>(
-      (acc, item) => {
-        const key = this.getEnvironmentLabel(item.kiosk.environmentType);
-        acc[key] = (acc[key] || 0) + 1;
-        return acc;
-      },
-      {},
-    );
+    const byBranch = feedbacks.reduce<Record<string, number>>((acc, item) => {
+      const key = item.branch?.name ?? 'Sem filial';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
 
-    const environmentHtml = Object.entries(byEnvironment)
+    const branchHtml = Object.entries(byBranch)
       .map(
-        ([environment, count]) =>
-          `<li><strong>${environment}:</strong> ${count}</li>`,
+        ([branch, count]) =>
+          `<li><strong>${branch}:</strong> ${count}</li>`,
       )
       .join('');
 
@@ -193,8 +172,8 @@ export class NotificationsService {
         <p><strong>Total de feedbacks:</strong> ${total}</p>
         <p><strong>Média das notas:</strong> ${average}</p>
 
-        <h3>Distribuição por ambiente</h3>
-        <ul>${environmentHtml || '<li>Sem dados</li>'}</ul>
+        <h3>Distribuição por filial</h3>
+        <ul>${branchHtml || '<li>Sem dados</li>'}</ul>
       </div>
     `;
   }
@@ -422,11 +401,7 @@ export class NotificationsService {
             continue;
           }
 
-          const periodLabel = monthStart.toLocaleString('pt-BR', {
-            month: 'long',
-            year: 'numeric',
-            timeZone: 'America/Sao_Paulo',
-          });
+          const periodLabel = `${monthStart.toLocaleDateString('pt-BR')} até ${monthEnd.toLocaleDateString('pt-BR')}`;
 
           const html = this.buildMonthlyHtml(
             company.name,

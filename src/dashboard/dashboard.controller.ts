@@ -18,7 +18,7 @@ export class DashboardController {
 
   private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
     if (user.role === 'SUPER_ADMIN') {
-      return requestedCompanyId || user.companyId || undefined;
+      return requestedCompanyId || undefined;
     }
 
     return user.companyId ?? undefined;

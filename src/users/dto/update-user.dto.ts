@@ -1,4 +1,11 @@
-import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -19,7 +26,7 @@ export class UpdateUserDto {
   role?: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   companyId?: string;
 
   @IsOptional()

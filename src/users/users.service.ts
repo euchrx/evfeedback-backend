@@ -22,7 +22,7 @@ export class UsersService {
 
   findByEmail(email: string) {
     return this.prisma.user.findUnique({
-      where: { email },
+      where: { email: email.trim().toLowerCase() },
       include: { company: true },
     });
   }
@@ -62,10 +62,6 @@ export class UsersService {
     data: CreateUserDto,
     actorRole: AuthUser['role'],
   ) {
-    if (!companyId) {
-      throw new BadRequestException('companyId é obrigatório.');
-    }
-
     if (!data.name?.trim()) {
       throw new BadRequestException('Nome é obrigatório.');
     }
@@ -88,17 +84,30 @@ export class UsersService {
       );
     }
 
-    const company = await this.prisma.company.findUnique({
-      where: { id: companyId },
-      select: { id: true },
-    });
+    const normalizedEmail = data.email.trim().toLowerCase();
 
-    if (!company) {
-      throw new NotFoundException('Empresa não encontrada.');
+    const targetCompanyId =
+      data.role === 'SUPER_ADMIN' ? null : companyId ?? null;
+
+    if (data.role !== 'SUPER_ADMIN' && !targetCompanyId) {
+      throw new BadRequestException(
+        'companyId é obrigatório para COMPANY_ADMIN e MANAGER.',
+      );
+    }
+
+    if (targetCompanyId) {
+      const company = await this.prisma.company.findUnique({
+        where: { id: targetCompanyId },
+        select: { id: true },
+      });
+
+      if (!company) {
+        throw new NotFoundException('Empresa não encontrada.');
+      }
     }
 
     const emailExists = await this.prisma.user.findUnique({
-      where: { email: data.email.trim() },
+      where: { email: normalizedEmail },
       select: { id: true },
     });
 
@@ -111,10 +120,10 @@ export class UsersService {
     return this.prisma.user.create({
       data: {
         name: data.name.trim(),
-        email: data.email.trim().toLowerCase(),
+        email: normalizedEmail,
         passwordHash,
         role: data.role,
-        companyId,
+        companyId: targetCompanyId,
         active: data.active ?? true,
       },
       include: {
@@ -155,22 +164,36 @@ export class UsersService {
       );
     }
 
-    let targetCompanyId = existing.companyId;
+    const nextRole = data.role ?? existing.role;
+    let targetCompanyId: string | null = existing.companyId ?? null;
 
-    if (actor.role === 'SUPER_ADMIN' && data.companyId !== undefined) {
+    if (nextRole === 'SUPER_ADMIN') {
+      targetCompanyId = null;
+    } else if (actor.role === 'SUPER_ADMIN' && data.companyId !== undefined) {
+      targetCompanyId = data.companyId?.trim() || null;
+    }
+
+    if (nextRole !== 'SUPER_ADMIN' && !targetCompanyId) {
+      throw new BadRequestException(
+        'companyId é obrigatório para COMPANY_ADMIN e MANAGER.',
+      );
+    }
+
+    if (targetCompanyId) {
       const targetCompany = await this.prisma.company.findUnique({
-        where: { id: data.companyId },
+        where: { id: targetCompanyId },
         select: { id: true },
       });
 
       if (!targetCompany) {
         throw new NotFoundException('Empresa não encontrada.');
       }
-
-      targetCompanyId = data.companyId;
     }
 
-    if (data.email && data.email.trim().toLowerCase() !== existing.email) {
+    if (
+      data.email !== undefined &&
+      data.email.trim().toLowerCase() !== existing.email
+    ) {
       const emailExists = await this.prisma.user.findUnique({
         where: { email: data.email.trim().toLowerCase() },
         select: { id: true },
@@ -188,10 +211,11 @@ export class UsersService {
         : {}),
       ...(data.role !== undefined ? { role: data.role } : {}),
       ...(data.active !== undefined ? { active: data.active } : {}),
-      ...(actor.role === 'SUPER_ADMIN' && data.companyId !== undefined
-        ? { companyId: targetCompanyId }
-        : {}),
     };
+
+    if (actor.role === 'SUPER_ADMIN' || nextRole === 'SUPER_ADMIN') {
+      updateData.companyId = targetCompanyId;
+    }
 
     if (data.password?.trim()) {
       updateData.passwordHash = await bcrypt.hash(data.password, 10);
@@ -278,6 +302,12 @@ export class UsersService {
 
     if (!existing) {
       throw new NotFoundException('Usuário não encontrado.');
+    }
+
+    if (actor.role !== 'SUPER_ADMIN' && existing.role === 'SUPER_ADMIN') {
+      throw new ForbiddenException(
+        'Apenas SUPER_ADMIN pode excluir outro SUPER_ADMIN.',
+      );
     }
 
     if (actor.id === existing.id) {

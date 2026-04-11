@@ -26,7 +26,7 @@ export class FeedbacksController {
 
   private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
     if (user.role === 'SUPER_ADMIN') {
-      return requestedCompanyId;
+      return requestedCompanyId || undefined;
     }
 
     return user.companyId ?? undefined;
@@ -40,7 +40,6 @@ export class FeedbacksController {
     @Query('branchId') branchId?: string,
     @Query('kioskId') kioskId?: string,
     @Query('rating') rating?: string,
-    @Query('environmentType') environmentType?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('active') active?: string,
@@ -53,29 +52,15 @@ export class FeedbacksController {
       branchId,
       kioskId,
       rating,
-      environmentType,
       startDate,
       endDate,
       active,
     });
   }
 
-  @Get(':id')
-  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
-  findOne(
-    @Req() req: any,
-    @Param('id') id: string,
-    @Query('companyId') companyId?: string,
-  ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
-
-    return this.feedbacksService.findOne(id, resolvedCompanyId);
-  }
-
   @Delete(':id')
-  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  remove(
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
+  hardDelete(
     @Req() req: any,
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
@@ -83,6 +68,6 @@ export class FeedbacksController {
     const user = req.user as AuthUser;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
-    return this.feedbacksService.remove(id, resolvedCompanyId);
+    return this.feedbacksService.hardDelete(id, resolvedCompanyId);
   }
 }

@@ -1,4 +1,11 @@
-import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 export class CreateUserDto {
   @IsString()
@@ -11,11 +18,11 @@ export class CreateUserDto {
   @MinLength(6)
   password: string;
 
-  @IsEnum(['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'])
+  @IsIn(['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'])
   role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   companyId?: string;
 
   @IsOptional()

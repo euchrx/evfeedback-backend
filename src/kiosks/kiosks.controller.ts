@@ -14,32 +14,14 @@ import { KiosksService } from './kiosks.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CreateKioskDto } from './dto/create-kiosk.dto';
+import { UpdateKioskDto } from './dto/update-kiosk.dto';
 
 type AuthUser = {
   id: string;
   email: string;
   role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
   companyId?: string | null;
-};
-
-type EnvironmentType = 'POSTO' | 'CONVENIENCIA' | 'RESTAURANTE';
-
-type CreateKioskBody = {
-  name: string;
-  branchId: string;
-  companyId?: string;
-  locationDescription?: string;
-  environmentType?: EnvironmentType;
-  active?: boolean;
-};
-
-type UpdateKioskBody = {
-  name?: string;
-  branchId?: string;
-  companyId?: string;
-  locationDescription?: string | null;
-  environmentType?: EnvironmentType;
-  active?: boolean;
 };
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -49,7 +31,7 @@ export class KiosksController {
 
   private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
     if (user.role === 'SUPER_ADMIN') {
-      return requestedCompanyId;
+      return requestedCompanyId || undefined;
     }
 
     return user.companyId ?? undefined;
@@ -78,8 +60,8 @@ export class KiosksController {
   }
 
   @Post()
-  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  create(@Req() req: any, @Body() body: CreateKioskBody) {
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
+  create(@Req() req: any, @Body() body: CreateKioskDto) {
     const user = req.user as AuthUser;
 
     const resolvedCompanyId =
@@ -87,22 +69,18 @@ export class KiosksController {
         ? body.companyId
         : (user.companyId ?? undefined);
 
-    return this.kiosksService.create({
-      name: body.name,
-      branchId: body.branchId,
-      companyId: resolvedCompanyId,
-      locationDescription: body.locationDescription,
-      environmentType: body.environmentType,
-      active: body.active,
+    return this.kiosksService.create(resolvedCompanyId, {
+      ...body,
+      companyId: resolvedCompanyId!,
     });
   }
 
   @Patch(':id')
-  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   update(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() body: UpdateKioskBody,
+    @Body() body: UpdateKioskDto,
     @Query('companyId') companyId?: string,
   ) {
     const user = req.user as AuthUser;
@@ -112,11 +90,18 @@ export class KiosksController {
         ? body.companyId ?? companyId
         : (user.companyId ?? undefined);
 
-    return this.kiosksService.update(id, resolvedCompanyId, body);
+    return this.kiosksService.update(
+      id,
+      resolvedCompanyId,
+      {
+        ...body,
+        ...(resolvedCompanyId !== undefined ? { companyId: resolvedCompanyId } : {}),
+      },
+    );
   }
 
   @Patch(':id/deactivate')
-  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   deactivate(
     @Req() req: any,
     @Param('id') id: string,
@@ -129,7 +114,7 @@ export class KiosksController {
   }
 
   @Patch(':id/activate')
-  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   activate(
     @Req() req: any,
     @Param('id') id: string,
@@ -142,7 +127,7 @@ export class KiosksController {
   }
 
   @Patch(':id/regenerate-token')
-  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   regenerateToken(
     @Req() req: any,
     @Param('id') id: string,

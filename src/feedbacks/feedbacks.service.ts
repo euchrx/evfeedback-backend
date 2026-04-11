@@ -1,12 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
-type FindAllFeedbacksFilters = {
+type FindFeedbacksFilters = {
   companyId?: string;
   branchId?: string;
   kioskId?: string;
   rating?: string;
-  environmentType?: string;
   startDate?: string;
   endDate?: string;
   active?: string;
@@ -16,55 +15,42 @@ type FindAllFeedbacksFilters = {
 export class FeedbacksService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(filters: FindAllFeedbacksFilters) {
-    const where: any = {};
-
-    if (filters.companyId) {
-      where.companyId = filters.companyId;
+  private buildDateRange(startDate?: string, endDate?: string) {
+    if (!startDate && !endDate) {
+      return undefined;
     }
 
-    if (filters.branchId) {
-      where.branchId = filters.branchId;
+    const createdAt: Record<string, Date> = {};
+
+    if (startDate) {
+      createdAt.gte = new Date(startDate);
     }
 
-    if (filters.kioskId) {
-      where.kioskId = filters.kioskId;
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      createdAt.lte = end;
     }
 
-    if (filters.rating !== undefined && filters.rating !== '') {
-      const parsedRating = Number(filters.rating);
+    return createdAt;
+  }
 
-      if (!Number.isNaN(parsedRating)) {
-        where.rating = parsedRating;
-      }
-    }
-
-    if (filters.environmentType) {
-      where.kiosk = {
-        environmentType: filters.environmentType,
-      };
-    }
-
-    if (filters.active !== undefined && filters.active !== '') {
-      where.active = filters.active === 'true';
-    }
-
-    if (filters.startDate || filters.endDate) {
-      where.createdAt = {};
-
-      if (filters.startDate) {
-        where.createdAt.gte = new Date(filters.startDate);
-      }
-
-      if (filters.endDate) {
-        const end = new Date(filters.endDate);
-        end.setHours(23, 59, 59, 999);
-        where.createdAt.lte = end;
-      }
-    }
+  async findAll(filters: FindFeedbacksFilters) {
+    const createdAt = this.buildDateRange(filters.startDate, filters.endDate);
 
     return this.prisma.feedback.findMany({
-      where,
+      where: {
+        ...(filters.companyId ? { companyId: filters.companyId } : {}),
+        ...(filters.branchId ? { branchId: filters.branchId } : {}),
+        ...(filters.kioskId ? { kioskId: filters.kioskId } : {}),
+        ...(filters.rating ? { rating: Number(filters.rating) } : {}),
+        ...(createdAt ? { createdAt } : {}),
+        ...(filters.active === 'true'
+          ? { kiosk: { active: true } }
+          : filters.active === 'false'
+            ? { kiosk: { active: false } }
+            : {}),
+      },
       include: {
         company: true,
         branch: true,
@@ -81,54 +67,21 @@ export class FeedbacksService {
     });
   }
 
-  async findOne(id: string, companyId?: string) {
-    const feedback = await this.prisma.feedback.findFirst({
+  async hardDelete(id: string, companyId?: string) {
+    const existing = await this.prisma.feedback.findFirst({
       where: {
         id,
         ...(companyId ? { companyId } : {}),
       },
-      include: {
-        company: true,
-        branch: true,
-        kiosk: true,
-        tags: {
-          include: {
-            tag: true,
-          },
-        },
-      },
+      select: { id: true },
     });
 
-    if (!feedback) {
+    if (!existing) {
       throw new NotFoundException('Feedback não encontrado.');
     }
 
-    return feedback;
-  }
-
-  async remove(id: string, companyId?: string) {
-    const feedback = await this.prisma.feedback.findFirst({
-      where: {
-        id,
-        ...(companyId ? { companyId } : {}),
-      },
-      select: {
-        id: true,
-      },
+    return this.prisma.feedback.delete({
+      where: { id: existing.id },
     });
-
-    if (!feedback) {
-      throw new NotFoundException('Feedback não encontrado.');
-    }
-
-    await this.prisma.feedback.delete({
-      where: {
-        id,
-      },
-    });
-
-    return {
-      message: 'Feedback excluído com sucesso.',
-    };
   }
 }
