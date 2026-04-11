@@ -49,10 +49,25 @@ export class SettingsService {
   private readonly apkFileName = 'evfeedback-latest.apk';
   private readonly apkMetadataFile = join(this.apkDirectory, 'metadata.json');
 
+  private async ensureCompanyExists(companyId: string) {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new NotFoundException(
+        'Empresa não encontrada para carregar as configurações.',
+      );
+    }
+  }
+
   async findByCompanyId(companyId?: string) {
     if (!companyId) {
       throw new BadRequestException('companyId é obrigatório.');
     }
+
+    await this.ensureCompanyExists(companyId);
 
     const existing = await this.prisma.setting.findUnique({
       where: {
@@ -101,6 +116,8 @@ export class SettingsService {
     if (!companyId) {
       throw new BadRequestException('companyId é obrigatório.');
     }
+
+    await this.ensureCompanyExists(companyId);
 
     const normalizedEmails =
       data.notificationEmails !== undefined
@@ -233,9 +250,7 @@ export class SettingsService {
       !fileName.toLowerCase().endsWith('.apk') ||
       extname(fileName).toLowerCase() !== '.apk'
     ) {
-      throw new BadRequestException(
-        'O arquivo enviado deve ter extensão .apk.',
-      );
+      throw new BadRequestException('O arquivo enviado deve ter extensão .apk.');
     }
 
     if (!file.buffer?.length) {
