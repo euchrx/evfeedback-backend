@@ -14,7 +14,7 @@ async function main() {
     },
   });
 
-  const passwordHash = await bcrypt.hash('123456', 10);
+  const passwordHash = await bcrypt.hash('C733800@m', 10);
 
   await prisma.user.upsert({
     where: { email: 'christian@evsystem.com.br' },
