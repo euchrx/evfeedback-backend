@@ -34,7 +34,7 @@ export class PublicService {
     private readonly prisma: PrismaService,
     private readonly kiosksService: KiosksService,
     private readonly settingsService: SettingsService,
-  ) {}
+  ) { }
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
@@ -68,15 +68,15 @@ export class PublicService {
       },
       company: kiosk.company
         ? {
-            id: kiosk.company.id,
-            name: kiosk.company.name,
-          }
+          id: kiosk.company.id,
+          name: kiosk.company.name,
+        }
         : null,
       branch: kiosk.branch
         ? {
-            id: kiosk.branch.id,
-            name: kiosk.branch.name,
-          }
+          id: kiosk.branch.id,
+          name: kiosk.branch.name,
+        }
         : null,
       settings,
     };
@@ -158,10 +158,10 @@ export class PublicService {
         companyId: kiosk.companyId,
         tags: validTagIds.length
           ? {
-              create: validTagIds.map((tagId) => ({
-                tagId,
-              })),
-            }
+            create: validTagIds.map((tagId) => ({
+              tagId,
+            })),
+          }
           : undefined,
       },
       include: {
@@ -211,12 +211,12 @@ export class PublicService {
 
     const startDate =
       input.startDate && input.startDate.trim()
-        ? new Date(`${input.startDate.trim()}T00:00:00.000Z`)
+        ? new Date(`${input.startDate.trim()}T00:00:00`)
         : undefined;
 
     const endDate =
       input.endDate && input.endDate.trim()
-        ? new Date(`${input.endDate.trim()}T23:59:59.999Z`)
+        ? new Date(`${input.endDate.trim()}T23:59:59.999`)
         : undefined;
 
     if (startDate && Number.isNaN(startDate.getTime())) {
@@ -241,11 +241,11 @@ export class PublicService {
         ...(rating !== undefined ? { rating } : {}),
         ...(startDate || endDate
           ? {
-              createdAt: {
-                ...(startDate ? { gte: startDate } : {}),
-                ...(endDate ? { lte: endDate } : {}),
-              },
-            }
+            createdAt: {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            },
+          }
           : {}),
       },
       include: {
