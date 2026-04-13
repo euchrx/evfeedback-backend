@@ -3,10 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { randomBytes, createHash } from 'node:crypto';
 import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { extname, join } from 'node:path';
+import { PrismaService } from '../prisma/prisma.service';
 
 type UpdateSettingsInput = {
   companyName?: string | null;
@@ -24,6 +25,11 @@ type UpdateSettingsInput = {
   notificationEmails?: string | null;
   dailyNotificationEnabled?: boolean;
   monthlyNotificationEnabled?: boolean;
+};
+
+type CreateSharedFeedbackAccessInput = {
+  label?: string | null;
+  expiresAt?: string | null;
 };
 
 type ApkMetadata = {
@@ -48,6 +54,14 @@ export class SettingsService {
   private readonly apkDirectory = join(process.cwd(), 'storage', 'apk');
   private readonly apkFileName = 'evfeedback-latest.apk';
   private readonly apkMetadataFile = join(this.apkDirectory, 'metadata.json');
+
+  private hashToken(token: string) {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  private generateAccessToken() {
+    return randomBytes(32).toString('hex');
+  }
 
   private async ensureCompanyExists(companyId: string) {
     const company = await this.prisma.company.findUnique({
@@ -192,6 +206,131 @@ export class SettingsService {
         ...(data.monthlyNotificationEnabled !== undefined
           ? { monthlyNotificationEnabled: data.monthlyNotificationEnabled }
           : {}),
+      },
+    });
+  }
+
+  async listSharedFeedbackAccesses(companyId?: string) {
+    if (!companyId) {
+      throw new BadRequestException('companyId é obrigatório.');
+    }
+
+    await this.ensureCompanyExists(companyId);
+
+    return this.prisma.sharedFeedbackAccess.findMany({
+      where: {
+        companyId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        label: true,
+        active: true,
+        expiresAt: true,
+        lastAccessAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async createSharedFeedbackAccess(
+    companyId: string | undefined,
+    data: CreateSharedFeedbackAccessInput,
+    baseUrl?: string,
+  ) {
+    if (!companyId) {
+      throw new BadRequestException('companyId é obrigatório.');
+    }
+
+    await this.ensureCompanyExists(companyId);
+
+    let expiresAt: Date | null = null;
+
+    if (data.expiresAt?.trim()) {
+      expiresAt = new Date(data.expiresAt.trim());
+
+      if (Number.isNaN(expiresAt.getTime())) {
+        throw new BadRequestException('expiresAt inválido.');
+      }
+    }
+
+    const token = this.generateAccessToken();
+    const tokenHash = this.hashToken(token);
+
+    const created = await this.prisma.sharedFeedbackAccess.create({
+      data: {
+        companyId,
+        label: data.label?.trim() || null,
+        tokenHash,
+        expiresAt,
+        active: true,
+      },
+      select: {
+        id: true,
+        label: true,
+        active: true,
+        expiresAt: true,
+        lastAccessAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const path = `/shared/feedbacks?token=${encodeURIComponent(token)}`;
+
+    return {
+      ...created,
+      token,
+      url: baseUrl ? `${baseUrl}${path}` : path,
+    };
+  }
+
+  async deactivateSharedFeedbackAccess(
+    companyId: string | undefined,
+    id: string,
+  ) {
+    if (!companyId) {
+      throw new BadRequestException('companyId é obrigatório.');
+    }
+
+    if (!id?.trim()) {
+      throw new BadRequestException('id é obrigatório.');
+    }
+
+    await this.ensureCompanyExists(companyId);
+
+    const existing = await this.prisma.sharedFeedbackAccess.findFirst({
+      where: {
+        id: id.trim(),
+        companyId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Link compartilhado não encontrado.');
+    }
+
+    return this.prisma.sharedFeedbackAccess.update({
+      where: {
+        id: existing.id,
+      },
+      data: {
+        active: false,
+      },
+      select: {
+        id: true,
+        label: true,
+        active: true,
+        expiresAt: true,
+        lastAccessAt: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
   }

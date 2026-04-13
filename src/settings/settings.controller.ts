@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
+  Param,
   Patch,
   Post,
   Query,
@@ -10,15 +12,14 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Request } from 'express';
 import { SettingsService } from './settings.service';
 import type { UploadedApkFile } from './settings.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { BadRequestException } from '@nestjs/common';
 import { NotificationsService } from '../notifications/notifications.service';
-import { FileInterceptor } from '@nestjs/platform-express';
-import type { Request } from 'express';
 
 type AuthUser = {
   id: string;
@@ -47,6 +48,11 @@ type UpdateSettingsBody = {
   notificationEmails?: string | null;
   dailyNotificationEnabled?: boolean;
   monthlyNotificationEnabled?: boolean;
+};
+
+type CreateSharedFeedbackAccessBody = {
+  label?: string | null;
+  expiresAt?: string | null;
 };
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -132,5 +138,49 @@ export class SettingsController {
     @UploadedFile() file?: UploadedApkFile,
   ) {
     return this.settingsService.saveLatestApk(file, this.getBaseUrl(req));
+  }
+
+  @Get('shared-feedback-accesses')
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  async listSharedFeedbackAccesses(
+    @Req() req: AuthenticatedRequest,
+    @Query('companyId') companyId?: string,
+  ) {
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
+    return this.settingsService.listSharedFeedbackAccesses(resolvedCompanyId);
+  }
+
+  @Post('shared-feedback-accesses')
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  async createSharedFeedbackAccess(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: CreateSharedFeedbackAccessBody,
+    @Query('companyId') companyId?: string,
+  ) {
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
+
+    return this.settingsService.createSharedFeedbackAccess(
+      resolvedCompanyId,
+      {
+        label: body.label,
+        expiresAt: body.expiresAt,
+      },
+      this.getBaseUrl(req),
+    );
+  }
+
+  @Patch('shared-feedback-accesses/:id/deactivate')
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  async deactivateSharedFeedbackAccess(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('companyId') companyId?: string,
+  ) {
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
+
+    return this.settingsService.deactivateSharedFeedbackAccess(
+      resolvedCompanyId,
+      id,
+    );
   }
 }

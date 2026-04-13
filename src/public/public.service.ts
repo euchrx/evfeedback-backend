@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { KiosksService } from '../kiosks/kiosks.service';
 import { SettingsService } from '../settings/settings.service';
@@ -18,6 +19,15 @@ type CreatePublicFeedbackInput = {
   contactConsent?: boolean;
 };
 
+type GetSharedFeedbacksInput = {
+  token: string;
+  branchId?: string;
+  kioskId?: string;
+  rating?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
 @Injectable()
 export class PublicService {
   constructor(
@@ -25,6 +35,10 @@ export class PublicService {
     private readonly kiosksService: KiosksService,
     private readonly settingsService: SettingsService,
   ) {}
+
+  private hashToken(token: string) {
+    return createHash('sha256').update(token).digest('hex');
+  }
 
   async getKioskConfig(token: string) {
     if (!token?.trim()) {
@@ -161,6 +175,120 @@ export class PublicService {
         },
       },
     });
+  }
+
+  async getSharedFeedbacks(input: GetSharedFeedbacksInput) {
+    const rawToken = input.token?.trim();
+
+    if (!rawToken) {
+      throw new BadRequestException('Token de acesso é obrigatório.');
+    }
+
+    const tokenHash = this.hashToken(rawToken);
+
+    const access = await this.prisma.sharedFeedbackAccess.findUnique({
+      where: {
+        tokenHash,
+      },
+    });
+
+    if (!access || access.active === false) {
+      throw new NotFoundException('Link inválido ou desativado.');
+    }
+
+    if (access.expiresAt && access.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('Este link expirou.');
+    }
+
+    const rating =
+      input.rating && input.rating.trim()
+        ? Number.parseInt(input.rating.trim(), 10)
+        : undefined;
+
+    if (rating !== undefined && (Number.isNaN(rating) || rating < 1 || rating > 5)) {
+      throw new BadRequestException('A nota deve estar entre 1 e 5.');
+    }
+
+    const startDate =
+      input.startDate && input.startDate.trim()
+        ? new Date(`${input.startDate.trim()}T00:00:00.000Z`)
+        : undefined;
+
+    const endDate =
+      input.endDate && input.endDate.trim()
+        ? new Date(`${input.endDate.trim()}T23:59:59.999Z`)
+        : undefined;
+
+    if (startDate && Number.isNaN(startDate.getTime())) {
+      throw new BadRequestException('startDate inválido.');
+    }
+
+    if (endDate && Number.isNaN(endDate.getTime())) {
+      throw new BadRequestException('endDate inválido.');
+    }
+
+    if (startDate && endDate && startDate > endDate) {
+      throw new BadRequestException(
+        'A data inicial não pode ser maior que a data final.',
+      );
+    }
+
+    const feedbacks = await this.prisma.feedback.findMany({
+      where: {
+        companyId: access.companyId,
+        ...(input.branchId?.trim() ? { branchId: input.branchId.trim() } : {}),
+        ...(input.kioskId?.trim() ? { kioskId: input.kioskId.trim() } : {}),
+        ...(rating !== undefined ? { rating } : {}),
+        ...(startDate || endDate
+          ? {
+              createdAt: {
+                ...(startDate ? { gte: startDate } : {}),
+                ...(endDate ? { lte: endDate } : {}),
+              },
+            }
+          : {}),
+      },
+      include: {
+        branch: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        kiosk: {
+          select: {
+            id: true,
+            name: true,
+            locationDescription: true,
+          },
+        },
+        tags: {
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    await this.prisma.sharedFeedbackAccess.update({
+      where: {
+        id: access.id,
+      },
+      data: {
+        lastAccessAt: new Date(),
+      },
+    });
+
+    return feedbacks;
   }
 
   async getLatestAppApk() {

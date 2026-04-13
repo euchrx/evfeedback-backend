@@ -22,6 +22,25 @@ export class PublicController {
     return this.publicService.getKioskTags(token ?? '');
   }
 
+  @Get('public/feedbacks')
+  getSharedFeedbacks(
+    @Query('token') token?: string,
+    @Query('branchId') branchId?: string,
+    @Query('kioskId') kioskId?: string,
+    @Query('rating') rating?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.publicService.getSharedFeedbacks({
+      token: token ?? '',
+      branchId,
+      kioskId,
+      rating,
+      startDate,
+      endDate,
+    });
+  }
+
   @Get('downloads/app/latest')
   async downloadLatestApp(@Res() res: Response) {
     const apk = await this.publicService.getLatestAppApk();

@@ -27,17 +27,18 @@ model User {
 }
 
 model Company {
-  id        String    @id @default(cuid())
-  name      String
-  active    Boolean   @default(true)
-  users     User[]
-  branches  Branch[]
-  kiosks    Kiosk[]
-  feedbacks Feedback[]
-  tags      Tag[]
-  setting   Setting?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                     String                 @id @default(cuid())
+  name                   String
+  active                 Boolean                @default(true)
+  users                  User[]
+  branches               Branch[]
+  kiosks                 Kiosk[]
+  feedbacks              Feedback[]
+  tags                   Tag[]
+  setting                Setting?
+  sharedFeedbackAccesses SharedFeedbackAccess[]
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
 }
 
 model Branch {
@@ -54,30 +55,30 @@ model Branch {
 }
 
 model Kiosk {
-  id                  String          @id @default(cuid())
+  id                  String   @id @default(cuid())
   name                String
-  token               String          @unique
+  token               String   @unique
   locationDescription String?
-  active              Boolean         @default(true)
+  active              Boolean  @default(true)
   companyId           String
-  company             Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   branchId            String
-  branch              Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch              Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
   feedbacks           Feedback[]
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model Tag {
-  id              String          @id @default(uuid())
-  name            String
-  color           String?
-  active          Boolean         @default(true)
-  companyId       String
-  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  items           FeedbackTag[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id        String        @id @default(uuid())
+  name      String
+  color     String?
+  active    Boolean       @default(true)
+  companyId String
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items     FeedbackTag[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 model Feedback {
@@ -109,24 +110,39 @@ model FeedbackTag {
 }
 
 model Setting {
-  id                        String   @id @default(cuid())
-  companyId                 String   @unique
-  company                   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  companyName               String?
-  logoUrl                   String?
-  thankYouMessage           String?
-  primaryColor              String?
-  kioskResetSeconds         Int      @default(5)
-  heroTitle                 String?
-  heroSubtitle              String?
-  backgroundColor           String?
-  backgroundImageUrl        String?
-  cardBackgroundColor       String?
-  textColor                 String?
-  buttonTextColor           String?
-  notificationEmails        String?
-  dailyNotificationEnabled  Boolean  @default(true)
-  monthlyNotificationEnabled Boolean @default(true)
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  id                         String   @id @default(cuid())
+  companyId                  String   @unique
+  company                    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyName                String?
+  logoUrl                    String?
+  thankYouMessage            String?
+  primaryColor               String?
+  kioskResetSeconds          Int      @default(5)
+  heroTitle                  String?
+  heroSubtitle               String?
+  backgroundColor            String?
+  backgroundImageUrl         String?
+  cardBackgroundColor        String?
+  textColor                  String?
+  buttonTextColor            String?
+  notificationEmails         String?
+  dailyNotificationEnabled   Boolean  @default(true)
+  monthlyNotificationEnabled Boolean  @default(true)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
+
+model SharedFeedbackAccess {
+  id           String   @id @default(cuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  label        String?
+  tokenHash    String   @unique
+  active       Boolean  @default(true)
+  expiresAt    DateTime?
+  lastAccessAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([companyId, active])
 }
