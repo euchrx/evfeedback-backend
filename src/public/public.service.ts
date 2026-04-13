@@ -211,12 +211,12 @@ export class PublicService {
 
     const startDate =
       input.startDate && input.startDate.trim()
-        ? new Date(`${input.startDate.trim()}T00:00:00`)
+        ? new Date(`${input.startDate.trim()}T00:00:00-03:00`)
         : undefined;
 
     const endDate =
       input.endDate && input.endDate.trim()
-        ? new Date(`${input.endDate.trim()}T23:59:59.999`)
+        ? new Date(`${input.endDate.trim()}T23:59:59.999-03:00`)
         : undefined;
 
     if (startDate && Number.isNaN(startDate.getTime())) {
