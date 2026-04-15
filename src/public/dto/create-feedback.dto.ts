@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsInt,
   IsOptional,
+  IsEmail,
   IsString,
   Max,
   Min,
@@ -21,6 +22,10 @@ export class CreateFeedbackDto {
   @IsOptional()
   @IsString()
   comment?: string;
+
+  @IsString()
+  @IsEmail()
+  email: string;
 
   @IsOptional()
   @IsArray()

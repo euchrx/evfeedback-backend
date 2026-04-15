@@ -85,6 +85,7 @@ model Feedback {
   id             String        @id @default(cuid())
   rating         Int
   comment        String?
+  email          String
   contactName    String?
   contactPhone   String?
   contactMessage String?

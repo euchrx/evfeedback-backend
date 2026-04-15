@@ -12,6 +12,7 @@ type CreatePublicFeedbackInput = {
   token: string;
   rating: number;
   comment?: string;
+  email: string;
   tagIds?: string[];
   contactName?: string;
   contactPhone?: string;
@@ -34,7 +35,7 @@ export class PublicService {
     private readonly prisma: PrismaService,
     private readonly kiosksService: KiosksService,
     private readonly settingsService: SettingsService,
-  ) { }
+  ) {}
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
@@ -68,15 +69,15 @@ export class PublicService {
       },
       company: kiosk.company
         ? {
-          id: kiosk.company.id,
-          name: kiosk.company.name,
-        }
+            id: kiosk.company.id,
+            name: kiosk.company.name,
+          }
         : null,
       branch: kiosk.branch
         ? {
-          id: kiosk.branch.id,
-          name: kiosk.branch.name,
-        }
+            id: kiosk.branch.id,
+            name: kiosk.branch.name,
+          }
         : null,
       settings,
     };
@@ -111,6 +112,17 @@ export class PublicService {
 
     if (!dto?.rating || dto.rating < 1 || dto.rating > 5) {
       throw new BadRequestException('A nota deve estar entre 1 e 5.');
+    }
+
+    const email = dto.email?.trim().toLowerCase() || '';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!email) {
+      throw new BadRequestException('E-mail é obrigatório.');
+    }
+
+    if (!emailRegex.test(email)) {
+      throw new BadRequestException('Informe um e-mail válido.');
     }
 
     const kiosk = await this.kiosksService.findByToken(dto.token.trim());
@@ -149,6 +161,7 @@ export class PublicService {
       data: {
         rating: dto.rating,
         comment: dto.comment?.trim() || null,
+        email,
         contactName,
         contactPhone,
         contactMessage,
@@ -158,10 +171,10 @@ export class PublicService {
         companyId: kiosk.companyId,
         tags: validTagIds.length
           ? {
-            create: validTagIds.map((tagId) => ({
-              tagId,
-            })),
-          }
+              create: validTagIds.map((tagId) => ({
+                tagId,
+              })),
+            }
           : undefined,
       },
       include: {
@@ -241,11 +254,11 @@ export class PublicService {
         ...(rating !== undefined ? { rating } : {}),
         ...(startDate || endDate
           ? {
-            createdAt: {
-              ...(startDate ? { gte: startDate } : {}),
-              ...(endDate ? { lte: endDate } : {}),
-            },
-          }
+              createdAt: {
+                ...(startDate ? { gte: startDate } : {}),
+                ...(endDate ? { lte: endDate } : {}),
+              },
+            }
           : {}),
       },
       include: {
