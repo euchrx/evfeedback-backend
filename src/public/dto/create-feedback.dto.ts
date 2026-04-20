@@ -9,6 +9,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateFeedbackDto {
   @IsString()
@@ -23,9 +24,14 @@ export class CreateFeedbackDto {
   @IsString()
   comment?: string;
 
-  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim().toLowerCase();
+    return trimmed ? trimmed : undefined;
+  })
   @IsEmail()
-  email: string;
+  email?: string;
 
   @IsOptional()
   @IsArray()

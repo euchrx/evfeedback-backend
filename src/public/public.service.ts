@@ -12,7 +12,7 @@ type CreatePublicFeedbackInput = {
   token: string;
   rating: number;
   comment?: string;
-  email: string;
+  email?: string;
   tagIds?: string[];
   contactName?: string;
   contactPhone?: string;
@@ -35,7 +35,7 @@ export class PublicService {
     private readonly prisma: PrismaService,
     private readonly kiosksService: KiosksService,
     private readonly settingsService: SettingsService,
-  ) {}
+  ) { }
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
@@ -69,15 +69,15 @@ export class PublicService {
       },
       company: kiosk.company
         ? {
-            id: kiosk.company.id,
-            name: kiosk.company.name,
-          }
+          id: kiosk.company.id,
+          name: kiosk.company.name,
+        }
         : null,
       branch: kiosk.branch
         ? {
-            id: kiosk.branch.id,
-            name: kiosk.branch.name,
-          }
+          id: kiosk.branch.id,
+          name: kiosk.branch.name,
+        }
         : null,
       settings,
     };
@@ -114,14 +114,10 @@ export class PublicService {
       throw new BadRequestException('A nota deve estar entre 1 e 5.');
     }
 
-    const email = dto.email?.trim().toLowerCase() || '';
+    const email = dto.email?.trim().toLowerCase() || null;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!email) {
-      throw new BadRequestException('E-mail é obrigatório.');
-    }
-
-    if (!emailRegex.test(email)) {
+    if (email && !emailRegex.test(email)) {
       throw new BadRequestException('Informe um e-mail válido.');
     }
 
@@ -171,10 +167,10 @@ export class PublicService {
         companyId: kiosk.companyId,
         tags: validTagIds.length
           ? {
-              create: validTagIds.map((tagId) => ({
-                tagId,
-              })),
-            }
+            create: validTagIds.map((tagId) => ({
+              tagId,
+            })),
+          }
           : undefined,
       },
       include: {
@@ -254,11 +250,11 @@ export class PublicService {
         ...(rating !== undefined ? { rating } : {}),
         ...(startDate || endDate
           ? {
-              createdAt: {
-                ...(startDate ? { gte: startDate } : {}),
-                ...(endDate ? { lte: endDate } : {}),
-              },
-            }
+            createdAt: {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            },
+          }
           : {}),
       },
       include: {
