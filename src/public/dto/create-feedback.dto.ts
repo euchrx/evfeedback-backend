@@ -1,15 +1,15 @@
+import { Transform } from 'class-transformer';
 import {
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsEmail,
   IsInt,
   IsOptional,
-  IsEmail,
   IsString,
   Max,
   Min,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
 
 export class CreateFeedbackDto {
   @IsString()
