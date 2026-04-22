@@ -14,6 +14,8 @@ import { BranchesService } from './branches.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CreateBranchDto } from './dto/create-branch.dto';
+import { UpdateBranchDto } from './dto/update-branch.dto';
 
 type UserRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
 
@@ -22,20 +24,6 @@ type AuthUser = {
   email: string;
   role: UserRole;
   companyId?: string | null;
-};
-
-type CreateBranchBody = {
-  name: string;
-  code?: string;
-  active?: boolean;
-  companyId?: string;
-};
-
-type UpdateBranchBody = {
-  name?: string;
-  code?: string;
-  active?: boolean;
-  companyId?: string;
 };
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -77,7 +65,7 @@ export class BranchesController {
 
   @Post()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  create(@Req() req: { user: AuthUser }, @Body() body: CreateBranchBody) {
+  create(@Req() req: { user: AuthUser }, @Body() body: CreateBranchDto) {
     const user = req.user;
 
     const resolvedCompanyId =
@@ -98,7 +86,7 @@ export class BranchesController {
   update(
     @Req() req: { user: AuthUser },
     @Param('id') id: string,
-    @Body() body: UpdateBranchBody,
+    @Body() body: UpdateBranchDto,
     @Query('companyId') companyId?: string,
   ) {
     const user = req.user;
