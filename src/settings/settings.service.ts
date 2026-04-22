@@ -49,7 +49,7 @@ export type UploadedApkFile = {
 
 @Injectable()
 export class SettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   private readonly apkDirectory = join(process.cwd(), 'storage', 'apk');
   private readonly apkFileName = 'evfeedback-latest.apk';
@@ -118,15 +118,17 @@ export class SettingsService {
   }
 
   private normalizeEmails(value?: string | null) {
-    if (value === undefined) {
-      return undefined;
-    }
-
-    if (!value.trim()) {
+    if (value == null) {
       return null;
     }
 
-    const emails = value
+    const normalizedValue = value.trim();
+
+    if (!normalizedValue) {
+      return null;
+    }
+
+    const emails = normalizedValue
       .split(/[\n,;]+/)
       .map((item) => item.trim().toLowerCase())
       .filter(Boolean);
@@ -215,17 +217,17 @@ export class SettingsService {
           : {}),
         ...(data.backgroundImageUrl !== undefined
           ? {
-              backgroundImageUrl: this.normalizeNullableText(
-                data.backgroundImageUrl,
-              ),
-            }
+            backgroundImageUrl: this.normalizeNullableText(
+              data.backgroundImageUrl,
+            ),
+          }
           : {}),
         ...(data.cardBackgroundColor !== undefined
           ? {
-              cardBackgroundColor: this.normalizeNullableText(
-                data.cardBackgroundColor,
-              ),
-            }
+            cardBackgroundColor: this.normalizeNullableText(
+              data.cardBackgroundColor,
+            ),
+          }
           : {}),
         ...(data.textColor !== undefined
           ? { textColor: this.normalizeNullableText(data.textColor) }
