@@ -2,14 +2,13 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
-  IsUUID,
   MinLength,
 } from 'class-validator';
 
 export class UpdateBranchDto {
   @IsOptional()
   @IsString({ message: 'Nome deve ser um texto.' })
-  @MinLength(1, { message: 'Nome da filial não pode ser vazio.' })
+  @MinLength(1, { message: 'Nome da filial é obrigatório.' })
   name?: string;
 
   @IsOptional()
@@ -21,6 +20,7 @@ export class UpdateBranchDto {
   active?: boolean;
 
   @IsOptional()
-  @IsUUID('4', { message: 'companyId inválido.' })
+  @IsString({ message: 'companyId inválido.' })
+  @MinLength(1, { message: 'companyId inválido.' })
   companyId?: string;
 }

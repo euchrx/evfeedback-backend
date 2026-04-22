@@ -2,7 +2,6 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
-  IsUUID,
   MinLength,
 } from 'class-validator';
 
@@ -20,6 +19,7 @@ export class CreateBranchDto {
   active?: boolean;
 
   @IsOptional()
-  @IsUUID('4', { message: 'companyId inválido.' })
+  @IsString({ message: 'companyId inválido.' })
+  @MinLength(1, { message: 'companyId inválido.' })
   companyId?: string;
 }

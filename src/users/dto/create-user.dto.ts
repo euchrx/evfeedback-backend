@@ -3,11 +3,10 @@ import {
   IsEmail,
   IsOptional,
   IsString,
-  IsUUID,
   MinLength,
+  IsIn,
 } from 'class-validator';
 import type { AppRole } from '../../auth/decorators/roles.decorator';
-import { IsIn } from 'class-validator';
 
 export class CreateUserDto {
   @IsString({ message: 'Nome deve ser um texto.' })
@@ -27,7 +26,8 @@ export class CreateUserDto {
   role!: AppRole;
 
   @IsOptional()
-  @IsUUID('4', { message: 'companyId inválido.' })
+  @IsString({ message: 'companyId inválido.' })
+  @MinLength(1, { message: 'companyId inválido.' })
   companyId?: string;
 
   @IsOptional()

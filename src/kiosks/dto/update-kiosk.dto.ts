@@ -2,7 +2,6 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
-  IsUUID,
   MinLength,
 } from 'class-validator';
 
@@ -17,11 +16,13 @@ export class UpdateKioskDto {
   locationDescription?: string;
 
   @IsOptional()
-  @IsUUID('4', { message: 'companyId inválido.' })
+  @IsString({ message: 'companyId inválido.' })
+  @MinLength(1, { message: 'companyId inválido.' })
   companyId?: string;
 
   @IsOptional()
-  @IsUUID('4', { message: 'branchId inválido.' })
+  @IsString({ message: 'branchId inválido.' })
+  @MinLength(1, { message: 'branchId inválido.' })
   branchId?: string;
 
   @IsOptional()
