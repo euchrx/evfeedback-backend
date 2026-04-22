@@ -1,3 +1,7 @@
+import { IsString, MinLength } from 'class-validator';
+
 export class CreateCompanyDto {
-  name: string;
+  @IsString({ message: 'Nome deve ser um texto.' })
+  @MinLength(1, { message: 'Nome é obrigatório.' })
+  name!: string;
 }

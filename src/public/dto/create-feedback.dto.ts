@@ -9,49 +9,51 @@ import {
   IsString,
   Max,
   Min,
+  MinLength,
 } from 'class-validator';
 
 export class CreateFeedbackDto {
-  @IsString()
-  token: string;
+  @IsString({ message: 'Token deve ser um texto.' })
+  @MinLength(1, { message: 'Token do kiosk é obrigatório.' })
+  token!: string;
 
-  @IsInt()
-  @Min(1)
-  @Max(5)
-  rating: number;
+  @IsInt({ message: 'A nota deve ser um número inteiro.' })
+  @Min(1, { message: 'A nota mínima é 1.' })
+  @Max(5, { message: 'A nota máxima é 5.' })
+  rating!: number;
 
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Comentário deve ser um texto.' })
   comment?: string;
 
   @IsOptional()
   @Transform(({ value }) => {
     if (typeof value !== 'string') return undefined;
     const trimmed = value.trim().toLowerCase();
-    return trimmed ? trimmed : undefined;
+    return trimmed || undefined;
   })
-  @IsEmail()
+  @IsEmail({}, { message: 'Informe um e-mail válido.' })
   email?: string;
 
   @IsOptional()
-  @IsArray()
-  @ArrayUnique()
-  @IsString({ each: true })
+  @IsArray({ message: 'tagIds deve ser uma lista.' })
+  @ArrayUnique({ message: 'tagIds não pode conter valores duplicados.' })
+  @IsString({ each: true, message: 'Cada tagId deve ser um texto.' })
   tagIds?: string[];
 
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Nome de contato deve ser um texto.' })
   contactName?: string;
 
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Telefone de contato deve ser um texto.' })
   contactPhone?: string;
 
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Mensagem de contato deve ser um texto.' })
   contactMessage?: string;
 
   @IsOptional()
-  @IsBoolean()
+  @IsBoolean({ message: 'contactConsent deve ser boolean.' })
   contactConsent?: boolean;
 }

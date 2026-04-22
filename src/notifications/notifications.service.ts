@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import * as nodemailer from 'nodemailer';
@@ -14,10 +19,10 @@ type FeedbackWithRelations = {
   contactConsent: boolean;
   kiosk: {
     name: string;
-  };
+  } | null;
   branch: {
     name: string;
-  };
+  } | null;
   tags: {
     tag: {
       name: string;
@@ -28,14 +33,15 @@ type FeedbackWithRelations = {
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
+  private readonly timeZone = 'America/Sao_Paulo';
 
   constructor(private readonly prisma: PrismaService) {}
 
   private getTransporter() {
-    const host = process.env.SMTP_HOST;
+    const host = process.env.SMTP_HOST?.trim();
     const port = Number(process.env.SMTP_PORT || 587);
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
+    const user = process.env.SMTP_USER?.trim();
+    const pass = process.env.SMTP_PASS?.trim();
     const secure = process.env.SMTP_SECURE === 'true';
 
     if (!host || !user || !pass) {
@@ -57,12 +63,18 @@ export class NotificationsService {
   }
 
   private getRecipients(notificationEmails?: string | null) {
-    if (!notificationEmails?.trim()) return [];
+    if (!notificationEmails?.trim()) {
+      return [];
+    }
 
-    return notificationEmails
-      .split(',')
-      .map((email) => email.trim())
-      .filter(Boolean);
+    return Array.from(
+      new Set(
+        notificationEmails
+          .split(',')
+          .map((email) => email.trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    );
   }
 
   private getRatingLabel(rating: number) {
@@ -86,8 +98,24 @@ export class NotificationsService {
     return new Intl.DateTimeFormat('pt-BR', {
       dateStyle: 'short',
       timeStyle: 'short',
-      timeZone: 'America/Sao_Paulo',
+      timeZone: this.timeZone,
     }).format(date);
+  }
+
+  private formatDateOnly(date: Date) {
+    return new Intl.DateTimeFormat('pt-BR', {
+      dateStyle: 'full',
+      timeZone: this.timeZone,
+    }).format(date);
+  }
+
+  private escapeHtml(value: string) {
+    return value
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
   }
 
   private buildDailyHtml(
@@ -102,12 +130,24 @@ export class NotificationsService {
 
         return `
           <tr>
-            <td style="padding:8px;border:1px solid #ddd;">${this.formatDate(feedback.createdAt)}</td>
-            <td style="padding:8px;border:1px solid #ddd;">${feedback.branch?.name ?? '-'}</td>
-            <td style="padding:8px;border:1px solid #ddd;">${feedback.kiosk?.name ?? '-'}</td>
-            <td style="padding:8px;border:1px solid #ddd;">${this.getRatingLabel(feedback.rating)}</td>
-            <td style="padding:8px;border:1px solid #ddd;">${feedback.comment ?? 'Sem comentário'}</td>
-            <td style="padding:8px;border:1px solid #ddd;">${tags}</td>
+            <td style="padding:8px;border:1px solid #ddd;">${this.escapeHtml(
+              this.formatDate(feedback.createdAt),
+            )}</td>
+            <td style="padding:8px;border:1px solid #ddd;">${this.escapeHtml(
+              feedback.branch?.name ?? '-',
+            )}</td>
+            <td style="padding:8px;border:1px solid #ddd;">${this.escapeHtml(
+              feedback.kiosk?.name ?? '-',
+            )}</td>
+            <td style="padding:8px;border:1px solid #ddd;">${this.escapeHtml(
+              this.getRatingLabel(feedback.rating),
+            )}</td>
+            <td style="padding:8px;border:1px solid #ddd;">${this.escapeHtml(
+              feedback.comment ?? 'Sem comentário',
+            )}</td>
+            <td style="padding:8px;border:1px solid #ddd;">${this.escapeHtml(
+              tags,
+            )}</td>
           </tr>
         `;
       })
@@ -116,8 +156,8 @@ export class NotificationsService {
     return `
       <div style="font-family:Arial,sans-serif;color:#111;">
         <h2>Resumo diário de feedbacks</h2>
-        <p><strong>Empresa:</strong> ${companyName}</p>
-        <p><strong>Período:</strong> ${dateLabel}</p>
+        <p><strong>Empresa:</strong> ${this.escapeHtml(companyName)}</p>
+        <p><strong>Período:</strong> ${this.escapeHtml(dateLabel)}</p>
         <p><strong>Total de feedbacks:</strong> ${feedbacks.length}</p>
 
         <table style="border-collapse:collapse;width:100%;margin-top:16px;">
@@ -158,14 +198,18 @@ export class NotificationsService {
     }, {});
 
     const branchHtml = Object.entries(byBranch)
-      .map(([branch, count]) => `<li><strong>${branch}:</strong> ${count}</li>`)
+      .sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+      .map(
+        ([branch, count]) =>
+          `<li><strong>${this.escapeHtml(branch)}:</strong> ${count}</li>`,
+      )
       .join('');
 
     return `
       <div style="font-family:Arial,sans-serif;color:#111;">
         <h2>Resumo mensal de feedbacks</h2>
-        <p><strong>Empresa:</strong> ${companyName}</p>
-        <p><strong>Período:</strong> ${periodLabel}</p>
+        <p><strong>Empresa:</strong> ${this.escapeHtml(companyName)}</p>
+        <p><strong>Período:</strong> ${this.escapeHtml(periodLabel)}</p>
         <p><strong>Total de feedbacks:</strong> ${total}</p>
         <p><strong>Média das notas:</strong> ${average}</p>
 
@@ -179,11 +223,11 @@ export class NotificationsService {
     const transporter = this.getTransporter();
 
     if (!transporter) {
-      throw new Error('SMTP não configurado.');
+      throw new BadRequestException('SMTP não configurado.');
     }
 
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      from: process.env.SMTP_FROM?.trim() || process.env.SMTP_USER?.trim(),
       to: to.join(','),
       subject,
       html,
@@ -191,21 +235,27 @@ export class NotificationsService {
   }
 
   async sendTestEmail(companyId: string) {
+    const normalizedCompanyId = companyId?.trim();
+
+    if (!normalizedCompanyId) {
+      throw new BadRequestException('companyId é obrigatório.');
+    }
+
     const company = await this.prisma.company.findUnique({
-      where: { id: companyId },
+      where: { id: normalizedCompanyId },
       include: {
         setting: true,
       },
     });
 
     if (!company) {
-      throw new Error('Empresa não encontrada.');
+      throw new NotFoundException('Empresa não encontrada.');
     }
 
     const recipients = this.getRecipients(company.setting?.notificationEmails);
 
     if (recipients.length === 0) {
-      throw new Error(
+      throw new BadRequestException(
         'Nenhum e-mail de notificação configurado para esta empresa.',
       );
     }
@@ -217,10 +267,12 @@ export class NotificationsService {
         <div style="font-family:Arial,sans-serif;color:#111;">
           <h2>Teste de e-mail do EvFeedback</h2>
           <p>Este é um envio de teste das notificações.</p>
-          <p><strong>Empresa:</strong> ${company.name}</p>
-          <p><strong>Data:</strong> ${new Date().toLocaleString('pt-BR', {
-            timeZone: 'America/Sao_Paulo',
-          })}</p>
+          <p><strong>Empresa:</strong> ${this.escapeHtml(company.name)}</p>
+          <p><strong>Data:</strong> ${this.escapeHtml(
+            new Date().toLocaleString('pt-BR', {
+              timeZone: this.timeZone,
+            }),
+          )}</p>
           <p>Se você recebeu esta mensagem, a configuração de SMTP está funcionando.</p>
         </div>
       `,
@@ -230,6 +282,48 @@ export class NotificationsService {
       message: 'E-mail de teste enviado com sucesso.',
       recipients,
     };
+  }
+
+  private async getActiveCompaniesWithSettings() {
+    return this.prisma.company.findMany({
+      where: {
+        active: true,
+      },
+      include: {
+        setting: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+  }
+
+  private async getFeedbacksForRange(
+    companyId: string,
+    start: Date,
+    end: Date,
+  ) {
+    return this.prisma.feedback.findMany({
+      where: {
+        companyId,
+        createdAt: {
+          gte: start,
+          lte: end,
+        },
+      },
+      include: {
+        kiosk: true,
+        branch: true,
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
   }
 
   @Cron('0 7 * * *', {
@@ -244,14 +338,7 @@ export class NotificationsService {
       const yesterdayEnd = new Date(yesterdayStart);
       yesterdayEnd.setHours(23, 59, 59, 999);
 
-      const companies = await this.prisma.company.findMany({
-        where: {
-          active: true,
-        },
-        include: {
-          setting: true,
-        },
-      });
+      const companies = await this.getActiveCompaniesWithSettings();
 
       for (const company of companies) {
         try {
@@ -266,36 +353,17 @@ export class NotificationsService {
             continue;
           }
 
-          const feedbacks = await this.prisma.feedback.findMany({
-            where: {
-              companyId: company.id,
-              createdAt: {
-                gte: yesterdayStart,
-                lte: yesterdayEnd,
-              },
-            },
-            include: {
-              kiosk: true,
-              branch: true,
-              tags: {
-                include: {
-                  tag: true,
-                },
-              },
-            },
-            orderBy: {
-              createdAt: 'asc',
-            },
-          });
+          const feedbacks = await this.getFeedbacksForRange(
+            company.id,
+            yesterdayStart,
+            yesterdayEnd,
+          );
 
           if (feedbacks.length === 0) {
             continue;
           }
 
-          const dateLabel = new Intl.DateTimeFormat('pt-BR', {
-            dateStyle: 'full',
-            timeZone: 'America/Sao_Paulo',
-          }).format(yesterdayStart);
+          const dateLabel = this.formatDateOnly(yesterdayStart);
 
           const html = this.buildDailyHtml(
             company.name,
@@ -350,14 +418,7 @@ export class NotificationsService {
         999,
       );
 
-      const companies = await this.prisma.company.findMany({
-        where: {
-          active: true,
-        },
-        include: {
-          setting: true,
-        },
-      });
+      const companies = await this.getActiveCompaniesWithSettings();
 
       for (const company of companies) {
         try {
@@ -372,27 +433,11 @@ export class NotificationsService {
             continue;
           }
 
-          const feedbacks = await this.prisma.feedback.findMany({
-            where: {
-              companyId: company.id,
-              createdAt: {
-                gte: monthStart,
-                lte: monthEnd,
-              },
-            },
-            include: {
-              kiosk: true,
-              branch: true,
-              tags: {
-                include: {
-                  tag: true,
-                },
-              },
-            },
-            orderBy: {
-              createdAt: 'asc',
-            },
-          });
+          const feedbacks = await this.getFeedbacksForRange(
+            company.id,
+            monthStart,
+            monthEnd,
+          );
 
           if (feedbacks.length === 0) {
             continue;

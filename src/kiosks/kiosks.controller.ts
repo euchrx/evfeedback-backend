@@ -17,10 +17,12 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateKioskDto } from './dto/create-kiosk.dto';
 import { UpdateKioskDto } from './dto/update-kiosk.dto';
 
+type UserRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+
 type AuthUser = {
-  id: string;
+  userId: string;
   email: string;
-  role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+  role: UserRole;
   companyId?: string | null;
 };
 
@@ -31,7 +33,8 @@ export class KiosksController {
 
   private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
     if (user.role === 'SUPER_ADMIN') {
-      return requestedCompanyId || undefined;
+      const normalizedRequestedCompanyId = requestedCompanyId?.trim();
+      return normalizedRequestedCompanyId || undefined;
     }
 
     return user.companyId ?? undefined;
@@ -39,34 +42,33 @@ export class KiosksController {
 
   @Get()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
-  findAll(@Req() req: any, @Query('companyId') companyId?: string) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
-
+  findAll(
+    @Req() req: { user: AuthUser },
+    @Query('companyId') companyId?: string,
+  ) {
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
     return this.kiosksService.findAll(resolvedCompanyId);
   }
 
   @Get(':id')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   findOne(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
-
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
     return this.kiosksService.findOne(id, resolvedCompanyId);
   }
 
   @Post()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
-  create(@Req() req: any, @Body() body: CreateKioskDto) {
-    const user = req.user as AuthUser;
+  create(@Req() req: { user: AuthUser }, @Body() body: CreateKioskDto) {
+    const user = req.user;
 
     const resolvedCompanyId =
       user.role === 'SUPER_ADMIN'
-        ? body.companyId
+        ? body.companyId?.trim() || undefined
         : (user.companyId ?? undefined);
 
     return this.kiosksService.create(resolvedCompanyId, {
@@ -78,16 +80,16 @@ export class KiosksController {
   @Patch(':id')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   update(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Body() body: UpdateKioskDto,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
+    const user = req.user;
 
     const resolvedCompanyId =
       user.role === 'SUPER_ADMIN'
-        ? (body.companyId ?? companyId)
+        ? (body.companyId?.trim() || companyId?.trim() || undefined)
         : (user.companyId ?? undefined);
 
     return this.kiosksService.update(id, resolvedCompanyId, {
@@ -101,52 +103,44 @@ export class KiosksController {
   @Patch(':id/deactivate')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   deactivate(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
-
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
     return this.kiosksService.deactivate(id, resolvedCompanyId);
   }
 
   @Patch(':id/activate')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   activate(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
-
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
     return this.kiosksService.activate(id, resolvedCompanyId);
   }
 
   @Patch(':id/regenerate-token')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   regenerateToken(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
-
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
     return this.kiosksService.regenerateToken(id, resolvedCompanyId);
   }
 
   @Delete(':id')
   @Roles('SUPER_ADMIN')
   hardDelete(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
-
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
     return this.kiosksService.hardDelete(id, resolvedCompanyId);
   }
 }

@@ -7,8 +7,6 @@ import { UsersModule } from './users/users.module';
 import { BranchesModule } from './branches/branches.module';
 import { KiosksModule } from './kiosks/kiosks.module';
 import { PublicModule } from './public/public.module';
-import { DashboardService } from './dashboard/dashboard.service';
-import { DashboardController } from './dashboard/dashboard.controller';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { FeedbacksModule } from './feedbacks/feedbacks.module';
 import { TagsModule } from './tags/tags.module';
@@ -35,7 +33,5 @@ import { NotificationsModule } from './notifications/notifications.module';
     SettingsModule,
     NotificationsModule,
   ],
-  providers: [DashboardService],
-  controllers: [DashboardController],
 })
 export class AppModule {}

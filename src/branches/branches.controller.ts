@@ -15,10 +15,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
+type UserRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+
 type AuthUser = {
-  id: string;
+  userId: string;
   email: string;
-  role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+  role: UserRole;
   companyId?: string | null;
 };
 
@@ -43,7 +45,8 @@ export class BranchesController {
 
   private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
     if (user.role === 'SUPER_ADMIN') {
-      return requestedCompanyId;
+      const normalizedRequestedCompanyId = requestedCompanyId?.trim();
+      return normalizedRequestedCompanyId || undefined;
     }
 
     return user.companyId ?? undefined;
@@ -51,9 +54,11 @@ export class BranchesController {
 
   @Get()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
-  findAll(@Req() req: any, @Query('companyId') companyId?: string) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+  findAll(
+    @Req() req: { user: AuthUser },
+    @Query('companyId') companyId?: string,
+  ) {
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
 
     return this.branchesService.findAll(resolvedCompanyId);
   }
@@ -61,24 +66,23 @@ export class BranchesController {
   @Get(':id')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   findOne(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
 
     return this.branchesService.findOne(id, resolvedCompanyId);
   }
 
   @Post()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  create(@Req() req: any, @Body() body: CreateBranchBody) {
-    const user = req.user as AuthUser;
+  create(@Req() req: { user: AuthUser }, @Body() body: CreateBranchBody) {
+    const user = req.user;
 
     const resolvedCompanyId =
       user.role === 'SUPER_ADMIN'
-        ? body.companyId
+        ? body.companyId?.trim() || undefined
         : (user.companyId ?? undefined);
 
     return this.branchesService.create({
@@ -92,30 +96,34 @@ export class BranchesController {
   @Patch(':id')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
   update(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Body() body: UpdateBranchBody,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
+    const user = req.user;
 
     const resolvedCompanyId =
       user.role === 'SUPER_ADMIN'
-        ? (body.companyId ?? companyId)
+        ? (body.companyId?.trim() || companyId?.trim() || undefined)
         : (user.companyId ?? undefined);
 
-    return this.branchesService.update(id, resolvedCompanyId, body);
+    return this.branchesService.update(id, resolvedCompanyId, {
+      name: body.name,
+      code: body.code,
+      active: body.active,
+      companyId: resolvedCompanyId,
+    });
   }
 
   @Patch(':id/deactivate')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
   deactivate(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
 
     return this.branchesService.deactivate(id, resolvedCompanyId);
   }
@@ -123,12 +131,11 @@ export class BranchesController {
   @Patch(':id/activate')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
   activate(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
 
     return this.branchesService.activate(id, resolvedCompanyId);
   }
@@ -136,12 +143,11 @@ export class BranchesController {
   @Delete(':id')
   @Roles('SUPER_ADMIN')
   hardDelete(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
 
     return this.branchesService.hardDelete(id, resolvedCompanyId);
   }

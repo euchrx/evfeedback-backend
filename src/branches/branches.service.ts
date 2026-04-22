@@ -23,6 +23,25 @@ type UpdateBranchInput = {
 export class BranchesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async ensureCompanyExists(companyId: string) {
+    const normalizedCompanyId = companyId.trim();
+
+    if (!normalizedCompanyId) {
+      throw new BadRequestException('companyId é obrigatório.');
+    }
+
+    const company = await this.prisma.company.findUnique({
+      where: { id: normalizedCompanyId },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
+    }
+
+    return normalizedCompanyId;
+  }
+
   async findAll(companyId?: string) {
     return this.prisma.branch.findMany({
       where: companyId ? { companyId } : undefined,
@@ -54,20 +73,24 @@ export class BranchesService {
   }
 
   async create(data: CreateBranchInput) {
-    if (!data.name?.trim()) {
+    const normalizedName = data.name?.trim();
+
+    if (!normalizedName) {
       throw new BadRequestException('Nome da filial é obrigatório.');
     }
 
-    if (!data.companyId) {
+    if (!data.companyId?.trim()) {
       throw new BadRequestException('companyId é obrigatório.');
     }
 
+    const normalizedCompanyId = await this.ensureCompanyExists(data.companyId);
+
     return this.prisma.branch.create({
       data: {
-        name: data.name.trim(),
+        name: normalizedName,
         code: data.code?.trim() || null,
         active: data.active ?? true,
-        companyId: data.companyId,
+        companyId: normalizedCompanyId,
       },
       include: {
         company: true,
@@ -91,13 +114,17 @@ export class BranchesService {
       throw new NotFoundException('Filial não encontrada.');
     }
 
+    if (data.name !== undefined && !data.name.trim()) {
+      throw new BadRequestException('Nome da filial é obrigatório.');
+    }
+
     return this.prisma.branch.update({
       where: {
         id: existing.id,
       },
       data: {
         ...(data.name !== undefined ? { name: data.name.trim() } : {}),
-        ...(data.code !== undefined ? { code: data.code?.trim() || null } : {}),
+        ...(data.code !== undefined ? { code: data.code.trim() || null } : {}),
         ...(data.active !== undefined ? { active: data.active } : {}),
       },
       include: {
@@ -162,6 +189,7 @@ export class BranchesService {
         id,
         ...(companyId ? { companyId } : {}),
       },
+      select: { id: true },
     });
 
     if (!existing) {

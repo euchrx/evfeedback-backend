@@ -9,5 +9,6 @@ import { SettingsModule } from '../settings/settings.module';
   imports: [PrismaModule, KiosksModule, SettingsModule],
   controllers: [PublicController],
   providers: [PublicService],
+  exports: [PublicService],
 })
 export class PublicModule {}

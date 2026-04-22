@@ -17,10 +17,12 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 
+type UserRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+
 type AuthUser = {
-  id: string;
+  userId: string;
   email: string;
-  role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+  role: UserRole;
   companyId?: string | null;
 };
 
@@ -31,7 +33,8 @@ export class TagsController {
 
   private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
     if (user.role === 'SUPER_ADMIN') {
-      return requestedCompanyId || undefined;
+      const normalizedRequestedCompanyId = requestedCompanyId?.trim();
+      return normalizedRequestedCompanyId || undefined;
     }
 
     return user.companyId ?? undefined;
@@ -39,8 +42,11 @@ export class TagsController {
 
   @Get()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
-  findAll(@Req() req: any, @Query('companyId') companyId?: string) {
-    const user = req.user as AuthUser;
+  findAll(
+    @Req() req: { user: AuthUser },
+    @Query('companyId') companyId?: string,
+  ) {
+    const user = req.user;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
     return this.tagsService.findAll(resolvedCompanyId);
@@ -49,11 +55,11 @@ export class TagsController {
   @Get(':id')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   findOne(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
+    const user = req.user;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
     return this.tagsService.findOne(id, resolvedCompanyId);
@@ -61,12 +67,12 @@ export class TagsController {
 
   @Post()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
-  create(@Req() req: any, @Body() body: CreateTagDto) {
-    const user = req.user as AuthUser;
+  create(@Req() req: { user: AuthUser }, @Body() body: CreateTagDto) {
+    const user = req.user;
 
     const resolvedCompanyId =
       user.role === 'SUPER_ADMIN'
-        ? body.companyId
+        ? body.companyId?.trim() || undefined
         : (user.companyId ?? undefined);
 
     return this.tagsService.create(resolvedCompanyId, {
@@ -78,16 +84,16 @@ export class TagsController {
   @Patch(':id')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   update(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Body() body: UpdateTagDto,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
+    const user = req.user;
 
     const resolvedCompanyId =
       user.role === 'SUPER_ADMIN'
-        ? (body.companyId ?? companyId)
+        ? (body.companyId?.trim() || companyId?.trim() || undefined)
         : (user.companyId ?? undefined);
 
     return this.tagsService.update(id, resolvedCompanyId, {
@@ -101,11 +107,11 @@ export class TagsController {
   @Patch(':id/deactivate')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   deactivate(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
+    const user = req.user;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
     return this.tagsService.deactivate(id, resolvedCompanyId);
@@ -114,11 +120,11 @@ export class TagsController {
   @Patch(':id/activate')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   activate(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
+    const user = req.user;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
     return this.tagsService.activate(id, resolvedCompanyId);
@@ -127,11 +133,11 @@ export class TagsController {
   @Delete(':id')
   @Roles('SUPER_ADMIN')
   hardDelete(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
+    const user = req.user;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
     return this.tagsService.hardDelete(id, resolvedCompanyId);

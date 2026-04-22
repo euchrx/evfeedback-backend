@@ -4,10 +4,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
+type UserRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+
 type AuthUser = {
-  id: string;
+  userId: string;
   email: string;
-  role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+  role: UserRole;
   companyId?: string | null;
 };
 
@@ -18,7 +20,8 @@ export class DashboardController {
 
   private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
     if (user.role === 'SUPER_ADMIN') {
-      return requestedCompanyId || undefined;
+      const normalizedRequestedCompanyId = requestedCompanyId?.trim();
+      return normalizedRequestedCompanyId || undefined;
     }
 
     return user.companyId ?? undefined;
@@ -27,13 +30,12 @@ export class DashboardController {
   @Get('summary')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   getSummary(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Query('companyId') companyId?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
   ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
 
     return this.service.getSummary(resolvedCompanyId, {
       dateFrom,
@@ -44,13 +46,12 @@ export class DashboardController {
   @Get('by-branch')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   getByBranch(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Query('companyId') companyId?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
   ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
 
     return this.service.getByBranch(resolvedCompanyId, {
       dateFrom,

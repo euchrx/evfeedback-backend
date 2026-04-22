@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
@@ -6,23 +6,32 @@ import { UsersService } from '../users/users.service';
 @Injectable()
 export class AuthService {
   constructor(
-    private usersService: UsersService,
-    private jwtService: JwtService,
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
   ) {}
 
   async login(email: string, password: string) {
     const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password.trim();
+
+    if (!normalizedEmail || !normalizedPassword) {
+      throw new UnauthorizedException('Email e senha são obrigatórios.');
+    }
 
     const user = await this.usersService.findByEmail(normalizedEmail);
 
     if (!user) {
-      throw new UnauthorizedException('Usuário não encontrado');
+      throw new UnauthorizedException('Usuário ou senha inválidos.');
     }
 
-    const isValid = await bcrypt.compare(password, user.passwordHash);
+    const isValid = await bcrypt.compare(normalizedPassword, user.passwordHash);
 
     if (!isValid) {
-      throw new UnauthorizedException('Senha inválida');
+      throw new UnauthorizedException('Usuário ou senha inválidos.');
+    }
+
+    if (!user.active) {
+      throw new ForbiddenException('Usuário desativado.');
     }
 
     const token = this.jwtService.sign({

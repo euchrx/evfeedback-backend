@@ -21,10 +21,12 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { NotificationsService } from '../notifications/notifications.service';
 
+type UserRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+
 type AuthUser = {
-  id: string;
+  userId: string;
   email: string;
-  role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+  role: UserRole;
   companyId?: string | null;
 };
 
@@ -75,7 +77,8 @@ export class SettingsController {
 
   private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
     if (user.role === 'SUPER_ADMIN') {
-      return requestedCompanyId;
+      const normalizedRequestedCompanyId = requestedCompanyId?.trim();
+      return normalizedRequestedCompanyId || undefined;
     }
 
     return user.companyId ?? undefined;
@@ -87,9 +90,7 @@ export class SettingsController {
     @Req() req: AuthenticatedRequest,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
-
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
     return this.settingsService.findByCompanyId(resolvedCompanyId);
   }
 
@@ -100,9 +101,7 @@ export class SettingsController {
     @Body() body: UpdateSettingsBody,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
-
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
     return this.settingsService.upsertByCompanyId(resolvedCompanyId, body);
   }
 
@@ -112,8 +111,7 @@ export class SettingsController {
     @Req() req: AuthenticatedRequest,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
 
     if (!resolvedCompanyId) {
       throw new BadRequestException(
@@ -132,7 +130,13 @@ export class SettingsController {
 
   @Post('app-apk')
   @Roles('SUPER_ADMIN')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 100 * 1024 * 1024,
+      },
+    }),
+  )
   async uploadAppApk(
     @Req() req: AuthenticatedRequest,
     @UploadedFile() file?: UploadedApkFile,

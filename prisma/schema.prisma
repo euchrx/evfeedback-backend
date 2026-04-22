@@ -24,6 +24,10 @@ model User {
   company      Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([role])
+  @@index([active])
 }
 
 model Company {
@@ -39,12 +43,14 @@ model Company {
   sharedFeedbackAccesses SharedFeedbackAccess[]
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
+
+  @@index([active])
 }
 
 model Branch {
   id        String     @id @default(cuid())
   name      String
-  code      String?    @unique
+  code      String?
   active    Boolean    @default(true)
   companyId String
   company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -52,21 +58,30 @@ model Branch {
   feedbacks Feedback[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([companyId, active])
 }
 
 model Kiosk {
-  id                  String   @id @default(cuid())
+  id                  String     @id @default(cuid())
   name                String
-  token               String   @unique
+  token               String     @unique
   locationDescription String?
-  active              Boolean  @default(true)
+  active              Boolean    @default(true)
   companyId           String
-  company             Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company             Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   branchId            String
-  branch              Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch              Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
   feedbacks           Feedback[]
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@index([companyId])
+  @@index([branchId])
+  @@index([companyId, active])
+  @@index([branchId, active])
 }
 
 model Tag {
@@ -79,6 +94,10 @@ model Tag {
   items     FeedbackTag[]
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+
+  @@index([companyId])
+  @@index([companyId, active])
+  @@index([name])
 }
 
 model Feedback {
@@ -98,6 +117,16 @@ model Feedback {
   branch         Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
   tags           FeedbackTag[]
   createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([companyId])
+  @@index([branchId])
+  @@index([kioskId])
+  @@index([rating])
+  @@index([createdAt])
+  @@index([companyId, createdAt])
+  @@index([branchId, createdAt])
+  @@index([kioskId, createdAt])
 }
 
 model FeedbackTag {
@@ -108,6 +137,8 @@ model FeedbackTag {
   tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([feedbackId, tagId])
+  @@index([feedbackId])
+  @@index([tagId])
 }
 
 model Setting {
@@ -134,16 +165,17 @@ model Setting {
 }
 
 model SharedFeedbackAccess {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   companyId    String
-  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   label        String?
-  tokenHash    String   @unique
-  active       Boolean  @default(true)
+  tokenHash    String    @unique
+  active       Boolean   @default(true)
   expiresAt    DateTime?
   lastAccessAt DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([companyId, active])
+  @@index([expiresAt])
 }

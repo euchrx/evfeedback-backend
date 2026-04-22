@@ -1,17 +1,24 @@
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MinLength,
+} from 'class-validator';
 
 export class CreateTagDto {
-  @IsString()
-  name: string;
+  @IsString({ message: 'Nome deve ser um texto.' })
+  @MinLength(1, { message: 'Nome é obrigatório.' })
+  name!: string;
 
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Cor deve ser um texto.' })
   color?: string;
 
-  @IsString()
-  companyId: string;
+  @IsUUID('4', { message: 'companyId inválido.' })
+  companyId!: string;
 
   @IsOptional()
-  @IsBoolean()
+  @IsBoolean({ message: 'active deve ser boolean.' })
   active?: boolean;
 }

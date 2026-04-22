@@ -12,10 +12,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
+type UserRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+
 type AuthUser = {
-  id: string;
+  userId: string;
   email: string;
-  role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+  role: UserRole;
   companyId?: string | null;
 };
 
@@ -26,7 +28,8 @@ export class FeedbacksController {
 
   private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
     if (user.role === 'SUPER_ADMIN') {
-      return requestedCompanyId || undefined;
+      const normalizedRequestedCompanyId = requestedCompanyId?.trim();
+      return normalizedRequestedCompanyId || undefined;
     }
 
     return user.companyId ?? undefined;
@@ -35,7 +38,7 @@ export class FeedbacksController {
   @Get()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   findAll(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Query('companyId') companyId?: string,
     @Query('branchId') branchId?: string,
     @Query('kioskId') kioskId?: string,
@@ -44,8 +47,7 @@ export class FeedbacksController {
     @Query('endDate') endDate?: string,
     @Query('active') active?: string,
   ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
 
     return this.feedbacksService.findAll({
       companyId: resolvedCompanyId,
@@ -61,12 +63,11 @@ export class FeedbacksController {
   @Delete(':id')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER')
   hardDelete(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
-    const resolvedCompanyId = this.resolveCompanyId(user, companyId);
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
 
     return this.feedbacksService.hardDelete(id, resolvedCompanyId);
   }

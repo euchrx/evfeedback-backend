@@ -46,6 +46,6 @@ export class PublicController {
     const apk = await this.publicService.getLatestAppApk();
 
     res.setHeader('Content-Type', apk.contentType);
-    res.download(apk.path, apk.downloadName);
+    return res.download(apk.path, apk.downloadName);
   }
 }

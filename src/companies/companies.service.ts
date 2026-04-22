@@ -1,16 +1,42 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 
 @Injectable()
 export class CompaniesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
+
+  private normalizeId(id: string) {
+    const normalizedId = id?.trim();
+
+    if (!normalizedId) {
+      throw new BadRequestException('id é obrigatório.');
+    }
+
+    return normalizedId;
+  }
+
+  private normalizeName(name?: string) {
+    const normalizedName = name?.trim();
+
+    if (!normalizedName) {
+      throw new BadRequestException('Nome é obrigatório.');
+    }
+
+    return normalizedName;
+  }
 
   async create(data: CreateCompanyDto) {
+    const normalizedName = this.normalizeName(data.name);
+
     return this.prisma.company.create({
       data: {
-        name: data.name,
+        name: normalizedName,
       },
     });
   }
@@ -24,8 +50,10 @@ export class CompaniesService {
   }
 
   async findOne(id: string) {
+    const normalizedId = this.normalizeId(id);
+
     const company = await this.prisma.company.findUnique({
-      where: { id },
+      where: { id: normalizedId },
     });
 
     if (!company) {
@@ -36,19 +64,34 @@ export class CompaniesService {
   }
 
   async update(id: string, data: UpdateCompanyDto) {
-    await this.ensureExists(id);
+    const normalizedId = this.normalizeId(id);
+    await this.ensureExists(normalizedId);
+
+    const updateData: {
+      name?: string;
+      active?: boolean;
+    } = {};
+
+    if (data.name !== undefined) {
+      updateData.name = this.normalizeName(data.name);
+    }
+
+    if (data.active !== undefined) {
+      updateData.active = data.active;
+    }
 
     return this.prisma.company.update({
-      where: { id },
-      data,
+      where: { id: normalizedId },
+      data: updateData,
     });
   }
 
   async deactivate(id: string) {
-    await this.ensureExists(id);
+    const normalizedId = this.normalizeId(id);
+    await this.ensureExists(normalizedId);
 
     return this.prisma.company.update({
-      where: { id },
+      where: { id: normalizedId },
       data: {
         active: false,
       },
@@ -56,10 +99,11 @@ export class CompaniesService {
   }
 
   async activate(id: string) {
-    await this.ensureExists(id);
+    const normalizedId = this.normalizeId(id);
+    await this.ensureExists(normalizedId);
 
     return this.prisma.company.update({
-      where: { id },
+      where: { id: normalizedId },
       data: {
         active: true,
       },
@@ -67,10 +111,11 @@ export class CompaniesService {
   }
 
   async hardDelete(id: string) {
-    await this.ensureExists(id);
+    const normalizedId = this.normalizeId(id);
+    await this.ensureExists(normalizedId);
 
     return this.prisma.company.delete({
-      where: { id },
+      where: { id: normalizedId },
     });
   }
 

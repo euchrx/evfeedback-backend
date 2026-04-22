@@ -11,6 +11,17 @@ import { UpdateTagDto } from './dto/update-tag.dto';
 export class TagsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async ensureCompanyExists(companyId: string) {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
+    }
+  }
+
   async findAll(companyId?: string) {
     return this.prisma.tag.findMany({
       where: companyId ? { companyId } : undefined,
@@ -46,23 +57,19 @@ export class TagsService {
       throw new BadRequestException('companyId é obrigatório.');
     }
 
-    if (!data.name?.trim()) {
+    const normalizedName = data.name?.trim();
+    const normalizedColor = data.color?.trim() || null;
+
+    if (!normalizedName) {
       throw new BadRequestException('Nome é obrigatório.');
     }
 
-    const company = await this.prisma.company.findUnique({
-      where: { id: companyId },
-      select: { id: true },
-    });
-
-    if (!company) {
-      throw new NotFoundException('Empresa não encontrada.');
-    }
+    await this.ensureCompanyExists(companyId);
 
     return this.prisma.tag.create({
       data: {
-        name: data.name.trim(),
-        color: data.color?.trim() || null,
+        name: normalizedName,
+        color: normalizedColor,
         active: data.active ?? true,
         companyId,
       },
@@ -87,19 +94,16 @@ export class TagsService {
       throw new NotFoundException('Tag não encontrada.');
     }
 
-    const targetCompanyId = data.companyId ?? existing.companyId;
+    const targetCompanyId = data.companyId?.trim() || existing.companyId;
 
     if (!targetCompanyId) {
       throw new BadRequestException('companyId é obrigatório.');
     }
 
-    const company = await this.prisma.company.findUnique({
-      where: { id: targetCompanyId },
-      select: { id: true },
-    });
+    await this.ensureCompanyExists(targetCompanyId);
 
-    if (!company) {
-      throw new NotFoundException('Empresa não encontrada.');
+    if (data.name !== undefined && !data.name.trim()) {
+      throw new BadRequestException('Nome é obrigatório.');
     }
 
     return this.prisma.tag.update({

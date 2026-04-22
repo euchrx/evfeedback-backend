@@ -9,10 +9,12 @@ import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
+type UserRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+
 type AuthUser = {
-  id: string;
+  userId: string;
   email: string;
-  role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+  role: UserRole;
   companyId?: string | null;
 };
 
@@ -57,57 +59,75 @@ export class UsersService {
     return user;
   }
 
+  private async ensureCompanyExists(companyId: string) {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
+    }
+  }
+
   async create(
     companyId: string | undefined,
     data: CreateUserDto,
-    actorRole: AuthUser['role'],
+    actor: AuthUser,
   ) {
-    if (!data.name?.trim()) {
+    const name = data.name?.trim();
+    const email = data.email?.trim().toLowerCase();
+    const password = data.password?.trim();
+    const role = data.role;
+
+    if (!name) {
       throw new BadRequestException('Nome é obrigatório.');
     }
 
-    if (!data.email?.trim()) {
+    if (!email) {
       throw new BadRequestException('Email é obrigatório.');
     }
 
-    if (!data.password?.trim()) {
+    if (!password) {
       throw new BadRequestException('Senha é obrigatória.');
     }
 
-    if (!data.role) {
+    if (!role) {
       throw new BadRequestException('Role é obrigatória.');
     }
 
-    if (actorRole !== 'SUPER_ADMIN' && data.role === 'SUPER_ADMIN') {
+    if (actor.role !== 'SUPER_ADMIN' && role === 'SUPER_ADMIN') {
       throw new ForbiddenException(
         'Apenas SUPER_ADMIN pode criar outro SUPER_ADMIN.',
       );
     }
 
-    const normalizedEmail = data.email.trim().toLowerCase();
+    if (actor.role === 'COMPANY_ADMIN' && role === 'COMPANY_ADMIN') {
+      throw new ForbiddenException(
+        'COMPANY_ADMIN não pode criar outro COMPANY_ADMIN.',
+      );
+    }
 
-    const targetCompanyId =
-      data.role === 'SUPER_ADMIN' ? null : (companyId ?? null);
+    const targetCompanyId = role === 'SUPER_ADMIN' ? null : (companyId ?? null);
 
-    if (data.role !== 'SUPER_ADMIN' && !targetCompanyId) {
+    if (role !== 'SUPER_ADMIN' && !targetCompanyId) {
       throw new BadRequestException(
         'companyId é obrigatório para COMPANY_ADMIN e MANAGER.',
       );
     }
 
-    if (targetCompanyId) {
-      const company = await this.prisma.company.findUnique({
-        where: { id: targetCompanyId },
-        select: { id: true },
-      });
+    if (role === 'SUPER_ADMIN' && data.companyId) {
+      throw new BadRequestException(
+        'SUPER_ADMIN não deve estar vinculado a uma empresa.',
+      );
+    }
 
-      if (!company) {
-        throw new NotFoundException('Empresa não encontrada.');
-      }
+    if (targetCompanyId) {
+      await this.ensureCompanyExists(targetCompanyId);
     }
 
     const emailExists = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
+      where: { email },
       select: { id: true },
     });
 
@@ -115,14 +135,14 @@ export class UsersService {
       throw new BadRequestException('Já existe um usuário com este email.');
     }
 
-    const passwordHash = await bcrypt.hash(data.password, 10);
+    const passwordHash = await bcrypt.hash(password, 10);
 
     return this.prisma.user.create({
       data: {
-        name: data.name.trim(),
-        email: normalizedEmail,
+        name,
+        email,
         passwordHash,
-        role: data.role,
+        role,
         companyId: targetCompanyId,
         active: data.active ?? true,
       },
@@ -164,13 +184,28 @@ export class UsersService {
       );
     }
 
+    if (
+      actor.role === 'COMPANY_ADMIN' &&
+      data.role === 'COMPANY_ADMIN' &&
+      existing.role !== 'COMPANY_ADMIN'
+    ) {
+      throw new ForbiddenException(
+        'COMPANY_ADMIN não pode promover outro usuário para COMPANY_ADMIN.',
+      );
+    }
+
     const nextRole = data.role ?? existing.role;
     let targetCompanyId: string | null = existing.companyId ?? null;
 
     if (nextRole === 'SUPER_ADMIN') {
       targetCompanyId = null;
-    } else if (actor.role === 'SUPER_ADMIN' && data.companyId !== undefined) {
-      targetCompanyId = data.companyId?.trim() || null;
+    } else if (actor.role === 'SUPER_ADMIN') {
+      if (data.companyId !== undefined) {
+        const normalizedCompanyId = data.companyId?.trim() || null;
+        targetCompanyId = normalizedCompanyId;
+      }
+    } else {
+      targetCompanyId = actor.companyId ?? null;
     }
 
     if (nextRole !== 'SUPER_ADMIN' && !targetCompanyId) {
@@ -179,23 +214,24 @@ export class UsersService {
       );
     }
 
-    if (targetCompanyId) {
-      const targetCompany = await this.prisma.company.findUnique({
-        where: { id: targetCompanyId },
-        select: { id: true },
-      });
+    if (nextRole === 'SUPER_ADMIN' && data.companyId) {
+      throw new BadRequestException(
+        'SUPER_ADMIN não deve estar vinculado a uma empresa.',
+      );
+    }
 
-      if (!targetCompany) {
-        throw new NotFoundException('Empresa não encontrada.');
-      }
+    if (targetCompanyId) {
+      await this.ensureCompanyExists(targetCompanyId);
     }
 
     if (
       data.email !== undefined &&
       data.email.trim().toLowerCase() !== existing.email
     ) {
+      const normalizedEmail = data.email.trim().toLowerCase();
+
       const emailExists = await this.prisma.user.findUnique({
-        where: { email: data.email.trim().toLowerCase() },
+        where: { email: normalizedEmail },
         select: { id: true },
       });
 
@@ -204,21 +240,63 @@ export class UsersService {
       }
     }
 
-    const updateData: any = {
-      ...(data.name !== undefined ? { name: data.name.trim() } : {}),
-      ...(data.email !== undefined
-        ? { email: data.email.trim().toLowerCase() }
-        : {}),
-      ...(data.role !== undefined ? { role: data.role } : {}),
-      ...(data.active !== undefined ? { active: data.active } : {}),
-    };
+    if (actor.userId === existing.id && data.role && data.role !== existing.role) {
+      throw new ForbiddenException(
+        'Você não pode alterar o próprio papel de acesso.',
+      );
+    }
+
+    const updateData: {
+      name?: string;
+      email?: string;
+      role?: UserRole;
+      active?: boolean;
+      companyId?: string | null;
+      passwordHash?: string;
+    } = {};
+
+    if (data.name !== undefined) {
+      const normalizedName = data.name.trim();
+
+      if (!normalizedName) {
+        throw new BadRequestException('Nome é obrigatório.');
+      }
+
+      updateData.name = normalizedName;
+    }
+
+    if (data.email !== undefined) {
+      const normalizedEmail = data.email.trim().toLowerCase();
+
+      if (!normalizedEmail) {
+        throw new BadRequestException('Email é obrigatório.');
+      }
+
+      updateData.email = normalizedEmail;
+    }
+
+    if (data.role !== undefined) {
+      updateData.role = data.role;
+    }
+
+    if (data.active !== undefined) {
+      updateData.active = data.active;
+    }
 
     if (actor.role === 'SUPER_ADMIN' || nextRole === 'SUPER_ADMIN') {
       updateData.companyId = targetCompanyId;
+    } else {
+      updateData.companyId = actor.companyId ?? null;
     }
 
-    if (data.password?.trim()) {
-      updateData.passwordHash = await bcrypt.hash(data.password, 10);
+    if (data.password !== undefined) {
+      const normalizedPassword = data.password.trim();
+
+      if (!normalizedPassword) {
+        throw new BadRequestException('Senha inválida.');
+      }
+
+      updateData.passwordHash = await bcrypt.hash(normalizedPassword, 10);
     }
 
     return this.prisma.user.update({
@@ -245,6 +323,12 @@ export class UsersService {
     if (actor.role !== 'SUPER_ADMIN' && existing.role === 'SUPER_ADMIN') {
       throw new ForbiddenException(
         'Apenas SUPER_ADMIN pode desativar outro SUPER_ADMIN.',
+      );
+    }
+
+    if (actor.userId === existing.id) {
+      throw new ForbiddenException(
+        'Você não pode desativar seu próprio usuário.',
       );
     }
 
@@ -310,7 +394,7 @@ export class UsersService {
       );
     }
 
-    if (actor.id === existing.id) {
+    if (actor.userId === existing.id) {
       throw new ForbiddenException(
         'Você não pode excluir seu próprio usuário.',
       );

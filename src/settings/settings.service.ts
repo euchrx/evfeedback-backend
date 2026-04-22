@@ -54,6 +54,7 @@ export class SettingsService {
   private readonly apkDirectory = join(process.cwd(), 'storage', 'apk');
   private readonly apkFileName = 'evfeedback-latest.apk';
   private readonly apkMetadataFile = join(this.apkDirectory, 'metadata.json');
+  private readonly maxApkSizeBytes = 100 * 1024 * 1024;
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
@@ -63,9 +64,23 @@ export class SettingsService {
     return randomBytes(32).toString('hex');
   }
 
+  private normalizeNullableText(value?: string | null) {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    return value?.trim() || null;
+  }
+
   private async ensureCompanyExists(companyId: string) {
+    const normalizedCompanyId = companyId.trim();
+
+    if (!normalizedCompanyId) {
+      throw new BadRequestException('companyId é obrigatório.');
+    }
+
     const company = await this.prisma.company.findUnique({
-      where: { id: companyId },
+      where: { id: normalizedCompanyId },
       select: { id: true },
     });
 
@@ -74,18 +89,20 @@ export class SettingsService {
         'Empresa não encontrada para carregar as configurações.',
       );
     }
+
+    return normalizedCompanyId;
   }
 
   async findByCompanyId(companyId?: string) {
-    if (!companyId) {
+    if (!companyId?.trim()) {
       throw new BadRequestException('companyId é obrigatório.');
     }
 
-    await this.ensureCompanyExists(companyId);
+    const normalizedCompanyId = await this.ensureCompanyExists(companyId);
 
     const existing = await this.prisma.setting.findUnique({
       where: {
-        companyId,
+        companyId: normalizedCompanyId,
       },
     });
 
@@ -95,13 +112,17 @@ export class SettingsService {
 
     return this.prisma.setting.create({
       data: {
-        companyId,
+        companyId: normalizedCompanyId,
       },
     });
   }
 
   private normalizeEmails(value?: string | null) {
-    if (!value?.trim()) {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (!value.trim()) {
       return null;
     }
 
@@ -113,7 +134,6 @@ export class SettingsService {
     const uniqueEmails = Array.from(new Set(emails));
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
     const invalid = uniqueEmails.find((email) => !emailRegex.test(email));
 
     if (invalid) {
@@ -127,75 +147,91 @@ export class SettingsService {
     companyId: string | undefined,
     data: UpdateSettingsInput,
   ) {
-    if (!companyId) {
+    if (!companyId?.trim()) {
       throw new BadRequestException('companyId é obrigatório.');
     }
 
-    await this.ensureCompanyExists(companyId);
+    const normalizedCompanyId = await this.ensureCompanyExists(companyId);
 
-    const normalizedEmails =
-      data.notificationEmails !== undefined
-        ? this.normalizeEmails(data.notificationEmails)
-        : undefined;
+    if (
+      data.kioskResetSeconds !== undefined &&
+      (!Number.isInteger(data.kioskResetSeconds) || data.kioskResetSeconds < 1)
+    ) {
+      throw new BadRequestException(
+        'kioskResetSeconds deve ser um número inteiro maior que zero.',
+      );
+    }
+
+    const normalizedEmails = this.normalizeEmails(data.notificationEmails);
 
     return this.prisma.setting.upsert({
       where: {
-        companyId,
+        companyId: normalizedCompanyId,
       },
       create: {
-        companyId,
-        companyName: data.companyName?.trim() || null,
-        logoUrl: data.logoUrl?.trim() || null,
-        thankYouMessage: data.thankYouMessage?.trim() || null,
-        primaryColor: data.primaryColor?.trim() || null,
+        companyId: normalizedCompanyId,
+        companyName: this.normalizeNullableText(data.companyName) ?? null,
+        logoUrl: this.normalizeNullableText(data.logoUrl) ?? null,
+        thankYouMessage: this.normalizeNullableText(data.thankYouMessage) ?? null,
+        primaryColor: this.normalizeNullableText(data.primaryColor) ?? null,
         kioskResetSeconds: data.kioskResetSeconds ?? 5,
-        heroTitle: data.heroTitle?.trim() || null,
-        heroSubtitle: data.heroSubtitle?.trim() || null,
-        backgroundColor: data.backgroundColor?.trim() || null,
-        backgroundImageUrl: data.backgroundImageUrl?.trim() || null,
-        cardBackgroundColor: data.cardBackgroundColor?.trim() || null,
-        textColor: data.textColor?.trim() || null,
-        buttonTextColor: data.buttonTextColor?.trim() || null,
+        heroTitle: this.normalizeNullableText(data.heroTitle) ?? null,
+        heroSubtitle: this.normalizeNullableText(data.heroSubtitle) ?? null,
+        backgroundColor: this.normalizeNullableText(data.backgroundColor) ?? null,
+        backgroundImageUrl:
+          this.normalizeNullableText(data.backgroundImageUrl) ?? null,
+        cardBackgroundColor:
+          this.normalizeNullableText(data.cardBackgroundColor) ?? null,
+        textColor: this.normalizeNullableText(data.textColor) ?? null,
+        buttonTextColor: this.normalizeNullableText(data.buttonTextColor) ?? null,
         notificationEmails: normalizedEmails ?? null,
         dailyNotificationEnabled: data.dailyNotificationEnabled ?? true,
         monthlyNotificationEnabled: data.monthlyNotificationEnabled ?? true,
       },
       update: {
         ...(data.companyName !== undefined
-          ? { companyName: data.companyName?.trim() || null }
+          ? { companyName: this.normalizeNullableText(data.companyName) }
           : {}),
         ...(data.logoUrl !== undefined
-          ? { logoUrl: data.logoUrl?.trim() || null }
+          ? { logoUrl: this.normalizeNullableText(data.logoUrl) }
           : {}),
         ...(data.thankYouMessage !== undefined
-          ? { thankYouMessage: data.thankYouMessage?.trim() || null }
+          ? { thankYouMessage: this.normalizeNullableText(data.thankYouMessage) }
           : {}),
         ...(data.primaryColor !== undefined
-          ? { primaryColor: data.primaryColor?.trim() || null }
+          ? { primaryColor: this.normalizeNullableText(data.primaryColor) }
           : {}),
         ...(data.kioskResetSeconds !== undefined
           ? { kioskResetSeconds: data.kioskResetSeconds }
           : {}),
         ...(data.heroTitle !== undefined
-          ? { heroTitle: data.heroTitle?.trim() || null }
+          ? { heroTitle: this.normalizeNullableText(data.heroTitle) }
           : {}),
         ...(data.heroSubtitle !== undefined
-          ? { heroSubtitle: data.heroSubtitle?.trim() || null }
+          ? { heroSubtitle: this.normalizeNullableText(data.heroSubtitle) }
           : {}),
         ...(data.backgroundColor !== undefined
-          ? { backgroundColor: data.backgroundColor?.trim() || null }
+          ? { backgroundColor: this.normalizeNullableText(data.backgroundColor) }
           : {}),
         ...(data.backgroundImageUrl !== undefined
-          ? { backgroundImageUrl: data.backgroundImageUrl?.trim() || null }
+          ? {
+              backgroundImageUrl: this.normalizeNullableText(
+                data.backgroundImageUrl,
+              ),
+            }
           : {}),
         ...(data.cardBackgroundColor !== undefined
-          ? { cardBackgroundColor: data.cardBackgroundColor?.trim() || null }
+          ? {
+              cardBackgroundColor: this.normalizeNullableText(
+                data.cardBackgroundColor,
+              ),
+            }
           : {}),
         ...(data.textColor !== undefined
-          ? { textColor: data.textColor?.trim() || null }
+          ? { textColor: this.normalizeNullableText(data.textColor) }
           : {}),
         ...(data.buttonTextColor !== undefined
-          ? { buttonTextColor: data.buttonTextColor?.trim() || null }
+          ? { buttonTextColor: this.normalizeNullableText(data.buttonTextColor) }
           : {}),
         ...(normalizedEmails !== undefined
           ? { notificationEmails: normalizedEmails }
@@ -211,15 +247,15 @@ export class SettingsService {
   }
 
   async listSharedFeedbackAccesses(companyId?: string) {
-    if (!companyId) {
+    if (!companyId?.trim()) {
       throw new BadRequestException('companyId é obrigatório.');
     }
 
-    await this.ensureCompanyExists(companyId);
+    const normalizedCompanyId = await this.ensureCompanyExists(companyId);
 
     return this.prisma.sharedFeedbackAccess.findMany({
       where: {
-        companyId,
+        companyId: normalizedCompanyId,
       },
       orderBy: {
         createdAt: 'desc',
@@ -241,11 +277,11 @@ export class SettingsService {
     data: CreateSharedFeedbackAccessInput,
     baseUrl?: string,
   ) {
-    if (!companyId) {
+    if (!companyId?.trim()) {
       throw new BadRequestException('companyId é obrigatório.');
     }
 
-    await this.ensureCompanyExists(companyId);
+    const normalizedCompanyId = await this.ensureCompanyExists(companyId);
 
     let expiresAt: Date | null = null;
 
@@ -262,8 +298,8 @@ export class SettingsService {
 
     const created = await this.prisma.sharedFeedbackAccess.create({
       data: {
-        companyId,
-        label: data.label?.trim() || null,
+        companyId: normalizedCompanyId,
+        label: this.normalizeNullableText(data.label) ?? null,
         tokenHash,
         expiresAt,
         active: true,
@@ -292,20 +328,21 @@ export class SettingsService {
     companyId: string | undefined,
     id: string,
   ) {
-    if (!companyId) {
+    if (!companyId?.trim()) {
       throw new BadRequestException('companyId é obrigatório.');
     }
 
-    if (!id?.trim()) {
+    const normalizedCompanyId = await this.ensureCompanyExists(companyId);
+    const normalizedId = id?.trim();
+
+    if (!normalizedId) {
       throw new BadRequestException('id é obrigatório.');
     }
 
-    await this.ensureCompanyExists(companyId);
-
     const existing = await this.prisma.sharedFeedbackAccess.findFirst({
       where: {
-        id: id.trim(),
-        companyId,
+        id: normalizedId,
+        companyId: normalizedCompanyId,
       },
       select: {
         id: true,
@@ -384,16 +421,30 @@ export class SettingsService {
     }
 
     const fileName = file.originalname?.trim() || '';
+    const extension = extname(fileName).toLowerCase();
+    const normalizedMimeType = (file.mimetype || '').toLowerCase();
 
-    if (
-      !fileName.toLowerCase().endsWith('.apk') ||
-      extname(fileName).toLowerCase() !== '.apk'
-    ) {
+    if (!fileName || extension !== '.apk') {
       throw new BadRequestException('O arquivo enviado deve ter extensão .apk.');
+    }
+
+    const allowedMimeTypes = [
+      'application/vnd.android.package-archive',
+      'application/octet-stream',
+    ];
+
+    if (normalizedMimeType && !allowedMimeTypes.includes(normalizedMimeType)) {
+      throw new BadRequestException('Tipo de arquivo inválido para APK.');
     }
 
     if (!file.buffer?.length) {
       throw new BadRequestException('O arquivo APK enviado está vazio.');
+    }
+
+    if ((file.size ?? file.buffer.length) > this.maxApkSizeBytes) {
+      throw new BadRequestException(
+        'O arquivo APK excede o tamanho máximo permitido.',
+      );
     }
 
     await this.ensureApkDirectory();
@@ -408,7 +459,8 @@ export class SettingsService {
     const metadata: ApkMetadata = {
       originalName: fileName,
       storedName: this.apkFileName,
-      contentType: file.mimetype || 'application/vnd.android.package-archive',
+      contentType:
+        file.mimetype || 'application/vnd.android.package-archive',
       size: file.size ?? file.buffer.length,
       uploadedAt: new Date().toISOString(),
     };

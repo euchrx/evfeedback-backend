@@ -17,10 +17,12 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
+type UserRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+
 type AuthUser = {
-  id: string;
+  userId: string;
   email: string;
-  role: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+  role: UserRole;
   companyId?: string | null;
 };
 
@@ -31,7 +33,8 @@ export class UsersController {
 
   private resolveCompanyId(user: AuthUser, requestedCompanyId?: string) {
     if (user.role === 'SUPER_ADMIN') {
-      return requestedCompanyId || undefined;
+      const normalizedRequestedCompanyId = requestedCompanyId?.trim();
+      return normalizedRequestedCompanyId || undefined;
     }
 
     return user.companyId ?? undefined;
@@ -39,8 +42,8 @@ export class UsersController {
 
   @Get()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  findAll(@Req() req: any, @Query('companyId') companyId?: string) {
-    const user = req.user as AuthUser;
+  findAll(@Req() req: { user: AuthUser }, @Query('companyId') companyId?: string) {
+    const user = req.user;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
     return this.usersService.findAll(resolvedCompanyId);
@@ -49,11 +52,11 @@ export class UsersController {
   @Get(':id')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
   findOne(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
+    const user = req.user;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
     return this.usersService.findOne(id, resolvedCompanyId);
@@ -61,14 +64,14 @@ export class UsersController {
 
   @Post()
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
-  create(@Req() req: any, @Body() body: CreateUserDto) {
-    const user = req.user as AuthUser;
+  create(@Req() req: { user: AuthUser }, @Body() body: CreateUserDto) {
+    const user = req.user;
 
     const resolvedCompanyId =
       body.role === 'SUPER_ADMIN'
         ? undefined
         : user.role === 'SUPER_ADMIN'
-          ? body.companyId
+          ? body.companyId?.trim() || undefined
           : (user.companyId ?? undefined);
 
     return this.usersService.create(
@@ -77,25 +80,25 @@ export class UsersController {
         ...body,
         companyId: body.role === 'SUPER_ADMIN' ? undefined : resolvedCompanyId,
       },
-      user.role,
+      user,
     );
   }
 
   @Patch(':id')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
   update(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Body() body: UpdateUserDto,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
+    const user = req.user;
 
     const resolvedCompanyId =
       body.role === 'SUPER_ADMIN'
         ? undefined
         : user.role === 'SUPER_ADMIN'
-          ? (body.companyId ?? companyId)
+          ? (body.companyId?.trim() || companyId?.trim() || undefined)
           : (user.companyId ?? undefined);
 
     return this.usersService.update(
@@ -112,11 +115,11 @@ export class UsersController {
   @Patch(':id/deactivate')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
   deactivate(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
+    const user = req.user;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
     return this.usersService.deactivate(id, resolvedCompanyId, user);
@@ -125,11 +128,11 @@ export class UsersController {
   @Patch(':id/activate')
   @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
   activate(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
+    const user = req.user;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
     return this.usersService.activate(id, resolvedCompanyId, user);
@@ -138,11 +141,11 @@ export class UsersController {
   @Delete(':id')
   @Roles('SUPER_ADMIN')
   hardDelete(
-    @Req() req: any,
+    @Req() req: { user: AuthUser },
     @Param('id') id: string,
     @Query('companyId') companyId?: string,
   ) {
-    const user = req.user as AuthUser;
+    const user = req.user;
     const resolvedCompanyId = this.resolveCompanyId(user, companyId);
 
     return this.usersService.hardDelete(id, resolvedCompanyId, user);

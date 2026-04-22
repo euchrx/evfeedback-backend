@@ -35,18 +35,57 @@ export class PublicService {
     private readonly prisma: PrismaService,
     private readonly kiosksService: KiosksService,
     private readonly settingsService: SettingsService,
-  ) { }
+  ) {}
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
   }
 
+  private normalizeNullableText(value?: string | null) {
+    return value?.trim() || null;
+  }
+
+  private normalizeOptionalId(value?: string) {
+    const normalized = value?.trim();
+    return normalized || undefined;
+  }
+
+  private parseBrazilDateRangeStart(date?: string) {
+    if (!date?.trim()) {
+      return undefined;
+    }
+
+    const parsed = new Date(`${date.trim()}T00:00:00-03:00`);
+
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('startDate inválido.');
+    }
+
+    return parsed;
+  }
+
+  private parseBrazilDateRangeEnd(date?: string) {
+    if (!date?.trim()) {
+      return undefined;
+    }
+
+    const parsed = new Date(`${date.trim()}T23:59:59.999-03:00`);
+
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('endDate inválido.');
+    }
+
+    return parsed;
+  }
+
   async getKioskConfig(token: string) {
-    if (!token?.trim()) {
+    const normalizedToken = token?.trim();
+
+    if (!normalizedToken) {
       throw new BadRequestException('Token do kiosk é obrigatório.');
     }
 
-    const kiosk = await this.kiosksService.findByToken(token.trim());
+    const kiosk = await this.kiosksService.findByToken(normalizedToken);
 
     if (!kiosk || kiosk.active === false) {
       throw new NotFoundException('Kiosk não encontrado ou inativo.');
@@ -69,26 +108,28 @@ export class PublicService {
       },
       company: kiosk.company
         ? {
-          id: kiosk.company.id,
-          name: kiosk.company.name,
-        }
+            id: kiosk.company.id,
+            name: kiosk.company.name,
+          }
         : null,
       branch: kiosk.branch
         ? {
-          id: kiosk.branch.id,
-          name: kiosk.branch.name,
-        }
+            id: kiosk.branch.id,
+            name: kiosk.branch.name,
+          }
         : null,
       settings,
     };
   }
 
   async getKioskTags(token: string) {
-    if (!token?.trim()) {
+    const normalizedToken = token?.trim();
+
+    if (!normalizedToken) {
       throw new BadRequestException('Token do kiosk é obrigatório.');
     }
 
-    const kiosk = await this.kiosksService.findByToken(token.trim());
+    const kiosk = await this.kiosksService.findByToken(normalizedToken);
 
     if (!kiosk || kiosk.active === false) {
       throw new NotFoundException('Kiosk não encontrado ou inativo.');
@@ -106,29 +147,37 @@ export class PublicService {
   }
 
   async createFeedback(dto: CreatePublicFeedbackInput) {
-    if (!dto?.token?.trim()) {
+    const normalizedToken = dto?.token?.trim();
+
+    if (!normalizedToken) {
       throw new BadRequestException('Token do kiosk é obrigatório.');
     }
 
-    if (!dto?.rating || dto.rating < 1 || dto.rating > 5) {
+    if (!Number.isInteger(dto.rating) || dto.rating < 1 || dto.rating > 5) {
       throw new BadRequestException('A nota deve estar entre 1 e 5.');
     }
 
-    const email = dto.email?.trim().toLowerCase() || null;
+    const email = this.normalizeNullableText(dto.email)?.toLowerCase() || null;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (email && !emailRegex.test(email)) {
       throw new BadRequestException('Informe um e-mail válido.');
     }
 
-    const kiosk = await this.kiosksService.findByToken(dto.token.trim());
+    const kiosk = await this.kiosksService.findByToken(normalizedToken);
 
     if (!kiosk || kiosk.active === false) {
       throw new NotFoundException('Kiosk não encontrado ou inativo.');
     }
 
     const validTagIds = Array.isArray(dto.tagIds)
-      ? dto.tagIds.filter(Boolean)
+      ? Array.from(
+          new Set(
+            dto.tagIds
+              .map((tagId) => tagId?.trim())
+              .filter((tagId): tagId is string => Boolean(tagId)),
+          ),
+        )
       : [];
 
     if (validTagIds.length > 0) {
@@ -148,15 +197,16 @@ export class PublicService {
       }
     }
 
-    const contactName = dto.contactName?.trim() || null;
-    const contactPhone = dto.contactPhone?.trim() || null;
-    const contactMessage = dto.contactMessage?.trim() || null;
+    const comment = this.normalizeNullableText(dto.comment);
+    const contactName = this.normalizeNullableText(dto.contactName);
+    const contactPhone = this.normalizeNullableText(dto.contactPhone);
+    const contactMessage = this.normalizeNullableText(dto.contactMessage);
     const contactConsent = dto.contactConsent === true;
 
     return this.prisma.feedback.create({
       data: {
         rating: dto.rating,
-        comment: dto.comment?.trim() || null,
+        comment,
         email,
         contactName,
         contactPhone,
@@ -167,10 +217,10 @@ export class PublicService {
         companyId: kiosk.companyId,
         tags: validTagIds.length
           ? {
-            create: validTagIds.map((tagId) => ({
-              tagId,
-            })),
-          }
+              create: validTagIds.map((tagId) => ({
+                tagId,
+              })),
+            }
           : undefined,
       },
       include: {
@@ -214,27 +264,15 @@ export class PublicService {
         ? Number.parseInt(input.rating.trim(), 10)
         : undefined;
 
-    if (rating !== undefined && (Number.isNaN(rating) || rating < 1 || rating > 5)) {
+    if (
+      rating !== undefined &&
+      (Number.isNaN(rating) || rating < 1 || rating > 5)
+    ) {
       throw new BadRequestException('A nota deve estar entre 1 e 5.');
     }
 
-    const startDate =
-      input.startDate && input.startDate.trim()
-        ? new Date(`${input.startDate.trim()}T00:00:00-03:00`)
-        : undefined;
-
-    const endDate =
-      input.endDate && input.endDate.trim()
-        ? new Date(`${input.endDate.trim()}T23:59:59.999-03:00`)
-        : undefined;
-
-    if (startDate && Number.isNaN(startDate.getTime())) {
-      throw new BadRequestException('startDate inválido.');
-    }
-
-    if (endDate && Number.isNaN(endDate.getTime())) {
-      throw new BadRequestException('endDate inválido.');
-    }
+    const startDate = this.parseBrazilDateRangeStart(input.startDate);
+    const endDate = this.parseBrazilDateRangeEnd(input.endDate);
 
     if (startDate && endDate && startDate > endDate) {
       throw new BadRequestException(
@@ -242,19 +280,22 @@ export class PublicService {
       );
     }
 
+    const branchId = this.normalizeOptionalId(input.branchId);
+    const kioskId = this.normalizeOptionalId(input.kioskId);
+
     const feedbacks = await this.prisma.feedback.findMany({
       where: {
         companyId: access.companyId,
-        ...(input.branchId?.trim() ? { branchId: input.branchId.trim() } : {}),
-        ...(input.kioskId?.trim() ? { kioskId: input.kioskId.trim() } : {}),
+        ...(branchId ? { branchId } : {}),
+        ...(kioskId ? { kioskId } : {}),
         ...(rating !== undefined ? { rating } : {}),
         ...(startDate || endDate
           ? {
-            createdAt: {
-              ...(startDate ? { gte: startDate } : {}),
-              ...(endDate ? { lte: endDate } : {}),
-            },
-          }
+              createdAt: {
+                ...(startDate ? { gte: startDate } : {}),
+                ...(endDate ? { lte: endDate } : {}),
+              },
+            }
           : {}),
       },
       include: {
@@ -301,12 +342,6 @@ export class PublicService {
   }
 
   async getLatestAppApk() {
-    const apk = await this.settingsService.getLatestApkFile();
-
-    if (!apk) {
-      throw new NotFoundException('APK não encontrado.');
-    }
-
-    return apk;
+    return this.settingsService.getLatestApkFile();
   }
 }

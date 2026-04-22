@@ -1,35 +1,40 @@
 import {
   IsBoolean,
   IsEmail,
-  IsIn,
   IsOptional,
   IsString,
+  IsUUID,
   MinLength,
 } from 'class-validator';
+import type { AppRole } from '../../auth/decorators/roles.decorator';
+import { IsIn } from 'class-validator';
 
 export class UpdateUserDto {
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Nome deve ser um texto.' })
+  @MinLength(1, { message: 'Nome não pode ser vazio.' })
   name?: string;
 
   @IsOptional()
-  @IsEmail()
+  @IsEmail({}, { message: 'Email inválido.' })
   email?: string;
 
   @IsOptional()
-  @IsString()
-  @MinLength(6)
+  @IsString({ message: 'Senha deve ser um texto.' })
+  @MinLength(6, { message: 'A senha deve ter pelo menos 6 caracteres.' })
   password?: string;
 
   @IsOptional()
-  @IsIn(['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'])
-  role?: 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'MANAGER';
+  @IsIn(['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'], {
+    message: 'Role inválida.',
+  })
+  role?: AppRole;
 
   @IsOptional()
-  @IsString()
+  @IsUUID('4', { message: 'companyId inválido.' })
   companyId?: string;
 
   @IsOptional()
-  @IsBoolean()
+  @IsBoolean({ message: 'active deve ser boolean.' })
   active?: boolean;
 }
