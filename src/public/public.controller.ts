@@ -1,11 +1,11 @@
-import { Body, Controller, Get, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
 import { PublicService } from './public.service';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
 import type { Response } from 'express';
 
 @Controller()
 export class PublicController {
-  constructor(private readonly publicService: PublicService) {}
+  constructor(private readonly publicService: PublicService) { }
 
   @Get('kiosk/config')
   getKioskConfig(@Query('token') token?: string) {
@@ -39,6 +39,14 @@ export class PublicController {
       startDate,
       endDate,
     });
+  }
+
+  @Get('downloads/logos/:fileName')
+  async downloadLogo(@Param('fileName') fileName: string, @Res() res: Response) {
+    const logo = await this.publicService.getLogoFile(fileName);
+
+    res.setHeader('Content-Type', logo.contentType);
+    return res.sendFile(logo.path);
   }
 
   @Get('downloads/app/latest')

@@ -47,14 +47,24 @@ export type UploadedApkFile = {
   buffer: Buffer;
 };
 
+export type UploadedLogoFile = {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+};
+
 @Injectable()
 export class SettingsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   private readonly apkDirectory = join(process.cwd(), 'storage', 'apk');
   private readonly apkFileName = 'evfeedback-latest.apk';
   private readonly apkMetadataFile = join(this.apkDirectory, 'metadata.json');
   private readonly maxApkSizeBytes = 100 * 1024 * 1024;
+
+  private readonly logoDirectory = join(process.cwd(), 'storage', 'logos');
+  private readonly maxLogoSizeBytes = 5 * 1024 * 1024;
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
@@ -65,10 +75,7 @@ export class SettingsService {
   }
 
   private normalizeNullableText(value?: string | null) {
-    if (value === undefined) {
-      return undefined;
-    }
-
+    if (value === undefined) return undefined;
     return value?.trim() || null;
   }
 
@@ -101,32 +108,21 @@ export class SettingsService {
     const normalizedCompanyId = await this.ensureCompanyExists(companyId);
 
     const existing = await this.prisma.setting.findUnique({
-      where: {
-        companyId: normalizedCompanyId,
-      },
+      where: { companyId: normalizedCompanyId },
     });
 
-    if (existing) {
-      return existing;
-    }
+    if (existing) return existing;
 
     return this.prisma.setting.create({
-      data: {
-        companyId: normalizedCompanyId,
-      },
+      data: { companyId: normalizedCompanyId },
     });
   }
 
   private normalizeEmails(value?: string | null) {
-    if (value == null) {
-      return null;
-    }
+    if (value == null) return null;
 
     const normalizedValue = value.trim();
-
-    if (!normalizedValue) {
-      return null;
-    }
+    if (!normalizedValue) return null;
 
     const emails = normalizedValue
       .split(/[\n,;]+/)
@@ -134,7 +130,6 @@ export class SettingsService {
       .filter(Boolean);
 
     const uniqueEmails = Array.from(new Set(emails));
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const invalid = uniqueEmails.find((email) => !emailRegex.test(email));
 
@@ -167,9 +162,7 @@ export class SettingsService {
     const normalizedEmails = this.normalizeEmails(data.notificationEmails);
 
     return this.prisma.setting.upsert({
-      where: {
-        companyId: normalizedCompanyId,
-      },
+      where: { companyId: normalizedCompanyId },
       create: {
         companyId: normalizedCompanyId,
         companyName: this.normalizeNullableText(data.companyName) ?? null,
@@ -217,17 +210,17 @@ export class SettingsService {
           : {}),
         ...(data.backgroundImageUrl !== undefined
           ? {
-            backgroundImageUrl: this.normalizeNullableText(
-              data.backgroundImageUrl,
-            ),
-          }
+              backgroundImageUrl: this.normalizeNullableText(
+                data.backgroundImageUrl,
+              ),
+            }
           : {}),
         ...(data.cardBackgroundColor !== undefined
           ? {
-            cardBackgroundColor: this.normalizeNullableText(
-              data.cardBackgroundColor,
-            ),
-          }
+              cardBackgroundColor: this.normalizeNullableText(
+                data.cardBackgroundColor,
+              ),
+            }
           : {}),
         ...(data.textColor !== undefined
           ? { textColor: this.normalizeNullableText(data.textColor) }
@@ -248,6 +241,141 @@ export class SettingsService {
     });
   }
 
+  private async ensureLogoDirectory() {
+    await mkdir(this.logoDirectory, { recursive: true });
+  }
+
+  private getLogoExtension(file: UploadedLogoFile) {
+    const originalExtension = extname(file.originalname || '').toLowerCase();
+
+    if (originalExtension) return originalExtension;
+
+    if (file.mimetype === 'image/png') return '.png';
+    if (file.mimetype === 'image/jpeg') return '.jpg';
+    if (file.mimetype === 'image/webp') return '.webp';
+    if (file.mimetype === 'image/svg+xml') return '.svg';
+
+    return '';
+  }
+
+  async saveLogo(
+    companyId: string | undefined,
+    file: UploadedLogoFile | undefined,
+    baseUrl?: string,
+  ) {
+    if (!companyId?.trim()) {
+      throw new BadRequestException('companyId é obrigatório.');
+    }
+
+    const normalizedCompanyId = await this.ensureCompanyExists(companyId);
+
+    if (!file) {
+      throw new BadRequestException('Envie uma imagem de logo.');
+    }
+
+    if (!file.buffer?.length) {
+      throw new BadRequestException('O arquivo enviado está vazio.');
+    }
+
+    if ((file.size ?? file.buffer.length) > this.maxLogoSizeBytes) {
+      throw new BadRequestException(
+        'A logo excede o tamanho máximo permitido de 5MB.',
+      );
+    }
+
+    const allowedMimeTypes = [
+      'image/png',
+      'image/jpeg',
+      'image/webp',
+      'image/svg+xml',
+    ];
+
+    const normalizedMimeType = (file.mimetype || '').toLowerCase();
+
+    if (!allowedMimeTypes.includes(normalizedMimeType)) {
+      throw new BadRequestException(
+        'Tipo de arquivo inválido. Envie PNG, JPG, WEBP ou SVG.',
+      );
+    }
+
+    const extension = this.getLogoExtension(file);
+
+    if (!extension || !['.png', '.jpg', '.jpeg', '.webp', '.svg'].includes(extension)) {
+      throw new BadRequestException(
+        'Extensão inválida. Envie PNG, JPG, WEBP ou SVG.',
+      );
+    }
+
+    await this.ensureLogoDirectory();
+
+    const storedName = `${normalizedCompanyId}-${Date.now()}-${randomBytes(8).toString(
+      'hex',
+    )}${extension}`;
+
+    const filePath = join(this.logoDirectory, storedName);
+
+    await writeFile(filePath, file.buffer);
+
+    const logoPath = `/downloads/logos/${storedName}`;
+    const logoUrl = baseUrl ? `${baseUrl}${logoPath}` : logoPath;
+
+    await this.prisma.setting.upsert({
+      where: {
+        companyId: normalizedCompanyId,
+      },
+      create: {
+        companyId: normalizedCompanyId,
+        logoUrl,
+      },
+      update: {
+        logoUrl,
+      },
+    });
+
+    return {
+      logoUrl,
+      logoPath,
+      originalName: file.originalname,
+      storedName,
+      contentType: file.mimetype,
+      size: file.size ?? file.buffer.length,
+      uploadedAt: new Date().toISOString(),
+    };
+  }
+
+  async getLogoFile(fileName: string) {
+    const normalizedFileName = fileName?.trim();
+
+    if (!normalizedFileName || normalizedFileName.includes('..')) {
+      throw new BadRequestException('Nome de arquivo inválido.');
+    }
+
+    const filePath = join(this.logoDirectory, normalizedFileName);
+
+    if (!existsSync(filePath)) {
+      throw new NotFoundException('Logo não encontrada.');
+    }
+
+    const extension = extname(normalizedFileName).toLowerCase();
+
+    const contentType =
+      extension === '.png'
+        ? 'image/png'
+        : extension === '.jpg' || extension === '.jpeg'
+          ? 'image/jpeg'
+          : extension === '.webp'
+            ? 'image/webp'
+            : extension === '.svg'
+              ? 'image/svg+xml'
+              : 'application/octet-stream';
+
+    return {
+      path: filePath,
+      contentType,
+      fileName: normalizedFileName,
+    };
+  }
+
   async listSharedFeedbackAccesses(companyId?: string) {
     if (!companyId?.trim()) {
       throw new BadRequestException('companyId é obrigatório.');
@@ -256,12 +384,8 @@ export class SettingsService {
     const normalizedCompanyId = await this.ensureCompanyExists(companyId);
 
     return this.prisma.sharedFeedbackAccess.findMany({
-      where: {
-        companyId: normalizedCompanyId,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      where: { companyId: normalizedCompanyId },
+      orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         label: true,
@@ -347,9 +471,7 @@ export class SettingsService {
         id: normalizedId,
         companyId: normalizedCompanyId,
       },
-      select: {
-        id: true,
-      },
+      select: { id: true },
     });
 
     if (!existing) {
@@ -357,12 +479,8 @@ export class SettingsService {
     }
 
     return this.prisma.sharedFeedbackAccess.update({
-      where: {
-        id: existing.id,
-      },
-      data: {
-        active: false,
-      },
+      where: { id: existing.id },
+      data: { active: false },
       select: {
         id: true,
         label: true,
@@ -384,9 +502,7 @@ export class SettingsService {
   }
 
   private async readApkMetadata(): Promise<ApkMetadata | null> {
-    if (!existsSync(this.apkMetadataFile)) {
-      return null;
-    }
+    if (!existsSync(this.apkMetadataFile)) return null;
 
     try {
       const content = await readFile(this.apkMetadataFile, 'utf-8');
@@ -400,9 +516,7 @@ export class SettingsService {
     const filePath = this.getApkFilePath();
     const metadata = await this.readApkMetadata();
 
-    if (!metadata || !existsSync(filePath)) {
-      return null;
-    }
+    if (!metadata || !existsSync(filePath)) return null;
 
     const fileStats = await stat(filePath);
     const downloadPath = '/downloads/app/latest';
@@ -462,8 +576,7 @@ export class SettingsService {
     const metadata: ApkMetadata = {
       originalName: fileName,
       storedName: this.apkFileName,
-      contentType:
-        file.mimetype || 'application/vnd.android.package-archive',
+      contentType: file.mimetype || 'application/vnd.android.package-archive',
       size: file.size ?? file.buffer.length,
       uploadedAt: new Date().toISOString(),
     };

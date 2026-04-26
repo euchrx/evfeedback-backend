@@ -363,6 +363,10 @@ export class PublicService {
     };
   }
 
+  async getLogoFile(fileName: string) {
+    return this.settingsService.getLogoFile(fileName);
+  }
+
   async getLatestAppApk() {
     return this.settingsService.getLatestApkFile();
   }

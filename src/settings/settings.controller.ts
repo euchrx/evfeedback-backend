@@ -15,7 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import { SettingsService } from './settings.service';
-import type { UploadedApkFile } from './settings.service';
+import type { UploadedApkFile, UploadedLogoFile } from './settings.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -103,6 +103,29 @@ export class SettingsController {
   ) {
     const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
     return this.settingsService.upsertByCompanyId(resolvedCompanyId, body);
+  }
+
+  @Post('logo')
+  @Roles('SUPER_ADMIN', 'COMPANY_ADMIN')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+      },
+    }),
+  )
+  async uploadLogo(
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() file?: UploadedLogoFile,
+    @Query('companyId') companyId?: string,
+  ) {
+    const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
+
+    return this.settingsService.saveLogo(
+      resolvedCompanyId,
+      file,
+      this.getBaseUrl(req),
+    );
   }
 
   @Post('test-email')
