@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { KiosksService } from '../kiosks/kiosks.service';
 import { SettingsService } from '../settings/settings.service';
+import { Prisma } from '@prisma/client';
 
 type CreatePublicFeedbackInput = {
   token: string;
@@ -22,11 +23,19 @@ type CreatePublicFeedbackInput = {
 
 type GetSharedFeedbacksInput = {
   token: string;
+
   branchId?: string;
   kioskId?: string;
   rating?: string;
+
   startDate?: string;
   endDate?: string;
+
+  page?: string;
+  pageSize?: string;
+
+  sortBy?: 'createdAt' | 'rating';
+  sortDirection?: 'asc' | 'desc';
 };
 
 @Injectable()
@@ -35,7 +44,7 @@ export class PublicService {
     private readonly prisma: PrismaService,
     private readonly kiosksService: KiosksService,
     private readonly settingsService: SettingsService,
-  ) {}
+  ) { }
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
@@ -108,15 +117,15 @@ export class PublicService {
       },
       company: kiosk.company
         ? {
-            id: kiosk.company.id,
-            name: kiosk.company.name,
-          }
+          id: kiosk.company.id,
+          name: kiosk.company.name,
+        }
         : null,
       branch: kiosk.branch
         ? {
-            id: kiosk.branch.id,
-            name: kiosk.branch.name,
-          }
+          id: kiosk.branch.id,
+          name: kiosk.branch.name,
+        }
         : null,
       settings,
     };
@@ -172,12 +181,12 @@ export class PublicService {
 
     const validTagIds = Array.isArray(dto.tagIds)
       ? Array.from(
-          new Set(
-            dto.tagIds
-              .map((tagId) => tagId?.trim())
-              .filter((tagId): tagId is string => Boolean(tagId)),
-          ),
-        )
+        new Set(
+          dto.tagIds
+            .map((tagId) => tagId?.trim())
+            .filter((tagId): tagId is string => Boolean(tagId)),
+        ),
+      )
       : [];
 
     if (validTagIds.length > 0) {
@@ -217,10 +226,10 @@ export class PublicService {
         companyId: kiosk.companyId,
         tags: validTagIds.length
           ? {
-              create: validTagIds.map((tagId) => ({
-                tagId,
-              })),
-            }
+            create: validTagIds.map((tagId) => ({
+              tagId,
+            })),
+          }
           : undefined,
       },
       include: {
@@ -246,19 +255,32 @@ export class PublicService {
     const tokenHash = this.hashToken(rawToken);
 
     const access = await this.prisma.sharedFeedbackAccess.findUnique({
-      where: {
-        tokenHash,
-      },
+      where: { tokenHash },
     });
 
     if (!access || access.active === false) {
       throw new NotFoundException('Link inválido ou desativado.');
     }
 
-    if (access.expiresAt && access.expiresAt.getTime() < Date.now()) {
+    // 🔥 expiração automática
+    if (access.expiresAt && access.expiresAt.getTime() <= Date.now()) {
+      await this.prisma.sharedFeedbackAccess.update({
+        where: { id: access.id },
+        data: { active: false },
+      });
+
       throw new BadRequestException('Este link expirou.');
     }
 
+    // 🔥 paginação
+    const page = Math.max(1, Number(input.page ?? 1));
+    const pageSize = Math.min(Number(input.pageSize ?? 20), 100);
+
+    // 🔥 ordenação
+    const sortBy = input.sortBy === 'rating' ? 'rating' : 'createdAt';
+    const sortDirection = input.sortDirection === 'asc' ? 'asc' : 'desc';
+
+    // 🔥 filtros
     const rating =
       input.rating && input.rating.trim()
         ? Number.parseInt(input.rating.trim(), 10)
@@ -283,62 +305,62 @@ export class PublicService {
     const branchId = this.normalizeOptionalId(input.branchId);
     const kioskId = this.normalizeOptionalId(input.kioskId);
 
-    const feedbacks = await this.prisma.feedback.findMany({
-      where: {
-        companyId: access.companyId,
-        ...(branchId ? { branchId } : {}),
-        ...(kioskId ? { kioskId } : {}),
-        ...(rating !== undefined ? { rating } : {}),
-        ...(startDate || endDate
-          ? {
-              createdAt: {
-                ...(startDate ? { gte: startDate } : {}),
-                ...(endDate ? { lte: endDate } : {}),
-              },
-            }
-          : {}),
-      },
-      include: {
-        branch: {
-          select: {
-            id: true,
-            name: true,
+    const where: Prisma.FeedbackWhereInput = {
+      companyId: access.companyId,
+      ...(branchId ? { branchId } : {}),
+      ...(kioskId ? { kioskId } : {}),
+      ...(rating !== undefined ? { rating } : {}),
+      ...(startDate || endDate
+        ? {
+          createdAt: {
+            ...(startDate ? { gte: startDate } : {}),
+            ...(endDate ? { lte: endDate } : {}),
           },
-        },
-        kiosk: {
-          select: {
-            id: true,
-            name: true,
-            locationDescription: true,
+        }
+        : {}),
+    };
+
+    // 🚀 query otimizada
+    const [items, total] = await Promise.all([
+      this.prisma.feedback.findMany({
+        where,
+        include: {
+          branch: {
+            select: { id: true, name: true },
           },
-        },
-        tags: {
-          include: {
-            tag: {
-              select: {
-                id: true,
-                name: true,
-                color: true,
+          kiosk: {
+            select: { id: true, name: true, locationDescription: true },
+          },
+          tags: {
+            include: {
+              tag: {
+                select: { id: true, name: true, color: true },
               },
             },
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+        orderBy: {
+          [sortBy]: sortDirection,
+        },
+        take: pageSize,
+        skip: (page - 1) * pageSize,
+      }),
+      this.prisma.feedback.count({ where }),
+    ]);
 
+    // 🔥 atualiza último acesso
     await this.prisma.sharedFeedbackAccess.update({
-      where: {
-        id: access.id,
-      },
-      data: {
-        lastAccessAt: new Date(),
-      },
+      where: { id: access.id },
+      data: { lastAccessAt: new Date() },
     });
 
-    return feedbacks;
+    return {
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    };
   }
 
   async getLatestAppApk() {

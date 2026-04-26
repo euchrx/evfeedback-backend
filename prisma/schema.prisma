@@ -168,8 +168,11 @@ model SharedFeedbackAccess {
   id           String    @id @default(cuid())
   companyId    String
   company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   label        String?
   tokenHash    String    @unique
+  publicToken  String?   @unique
+
   active       Boolean   @default(true)
   expiresAt    DateTime?
   lastAccessAt DateTime?

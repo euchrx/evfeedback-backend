@@ -303,6 +303,7 @@ export class SettingsService {
         companyId: normalizedCompanyId,
         label: this.normalizeNullableText(data.label) ?? null,
         tokenHash,
+        publicToken: token,
         expiresAt,
         active: true,
       },
