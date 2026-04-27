@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
-import * as nodemailer from 'nodemailer';
+import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { createHash, randomBytes } from 'node:crypto';
 
 type FeedbackWithRelations = {
@@ -39,15 +40,20 @@ export class NotificationsService {
 
     if (!host || !user || !pass) return null;
 
-    return nodemailer.createTransport({
+    const options = {
       host,
       port,
       secure,
       auth: { user, pass },
+
+      family: 4,
+
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 10000,
-    });
+    } as SMTPTransport.Options & { family: 4 };
+
+    return nodemailer.createTransport(options);
   }
 
   private getRecipients(notificationEmails?: string | null) {
