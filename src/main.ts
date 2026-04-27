@@ -1,6 +1,9 @@
+import dns from 'dns';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+
+dns.setDefaultResultOrder('ipv4first');
 
 type CorsCallback = (err: Error | null, allow?: boolean) => void;
 
