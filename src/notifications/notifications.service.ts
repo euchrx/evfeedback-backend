@@ -6,9 +6,8 @@ import {
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
-import nodemailer from 'nodemailer';
-import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { createHash, randomBytes } from 'node:crypto';
+import { Resend } from 'resend';
 
 type FeedbackWithRelations = {
   id: string;
@@ -29,72 +28,24 @@ export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly timeZone = 'America/Sao_Paulo';
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
-  private async getTransporter() {
-    const host = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com';
-    const port = Number(process.env.SMTP_PORT || 587);
-    const user = process.env.SMTP_USER?.trim();
-    const pass = process.env.SMTP_PASS?.trim();
-    const secure = process.env.SMTP_SECURE === 'true';
+  private getResend(): Resend {
+    const apiKey = process.env.RESEND_API_KEY?.trim();
 
-    if (!user || !pass) {
-      return null;
+    if (!apiKey) {
+      throw new BadRequestException('RESEND_API_KEY não configurada.');
     }
 
-    const { resolve4 } = await import('node:dns/promises');
+    return new Resend(apiKey);
+  }
 
-    let ipv4Address: string;
-
-    try {
-      const addresses = await resolve4(host);
-
-      if (addresses.length === 0) {
-        throw new Error(`Nenhum endereço IPv4 encontrado para ${host}`);
-      }
-
-      ipv4Address = addresses[0];
-    } catch (error) {
-      this.logger.error(
-        `Não foi possível resolver o IPv4 do servidor SMTP ${host}`,
-        error instanceof Error ? error.stack : String(error),
-      );
-
-      throw new BadRequestException(
-        `Não foi possível resolver o servidor SMTP ${host} em IPv4.`,
-      );
-    }
-
-    const options = {
-      host: ipv4Address,
-      port,
-      secure,
-      auth: {
-        user,
-        pass,
-      },
-
-      family: 4,
-
-      requireTLS: port === 587,
-
-      tls: {
-        servername: host,
-        minVersion: 'TLSv1.2',
-      },
-
-      connectionTimeout: 15_000,
-      greetingTimeout: 15_000,
-      socketTimeout: 30_000,
-    } as SMTPTransport.Options & {
-      family: 4;
-    };
-
-    this.logger.log(
-      `SMTP configurado em ${host} (${ipv4Address}) usando IPv4 e porta ${port}`,
+  private getEmailFrom(): string {
+    return (
+      process.env.EMAIL_FROM?.trim() ||
+      process.env.SMTP_FROM?.trim() ||
+      'EvFeedback <onboarding@resend.dev>'
     );
-
-    return nodemailer.createTransport(options);
   }
 
   private getRecipients(notificationEmails?: string | null) {
@@ -403,35 +354,39 @@ export class NotificationsService {
     `;
   }
 
-  private async sendMail(to: string[], subject: string, html: string) {
-    const transporter = await this.getTransporter();
-
-    if (!transporter) {
-      throw new BadRequestException('SMTP não configurado.');
-    }
-
+  private async sendMail(
+    to: string[],
+    subject: string,
+    html: string,
+  ): Promise<void> {
     try {
-      await transporter.verify();
+      const resend = this.getResend();
 
-      await transporter.sendMail({
-        from: process.env.SMTP_FROM?.trim() || process.env.SMTP_USER?.trim(),
-        to: to.join(','),
+      const { data, error } = await resend.emails.send({
+        from: this.getEmailFrom(),
+        to,
         subject,
         html,
       });
 
-      this.logger.log(`E-mail enviado para: ${to.join(', ')}`);
-    } catch (error) {
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      this.logger.log(
+        `E-mail enviado pela Resend para: ${to.join(', ')}${
+          data?.id ? ` | ID: ${data.id}` : ''
+        }`,
+      );
+    } catch (error: unknown) {
       this.logger.error(
-        'Erro SMTP ao enviar e-mail',
+        'Erro ao enviar e-mail pela Resend',
         error instanceof Error ? error.stack : String(error),
       );
 
       throw new BadRequestException(
         error instanceof Error ? error.message : 'Erro ao enviar e-mail.',
       );
-    } finally {
-      transporter.close();
     }
   }
 
