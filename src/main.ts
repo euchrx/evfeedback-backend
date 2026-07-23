@@ -1,11 +1,11 @@
-import dns from 'dns';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { setDefaultResultOrder } from 'node:dns';
 import { AppModule } from './app.module';
 
-dns.setDefaultResultOrder('ipv4first');
+setDefaultResultOrder('ipv4first');
 
-type CorsCallback = (err: Error | null, allow?: boolean) => void;
+type CorsCallback = (error: Error | null, allow?: boolean) => void;
 
 function parseAllowedOrigins(envValue?: string): string[] {
   if (!envValue) {
@@ -22,7 +22,7 @@ function parseAllowedOrigins(envValue?: string): string[] {
     .filter(Boolean);
 }
 
-async function bootstrap() {
+async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
   const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGINS);
@@ -39,16 +39,22 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: (origin: string | undefined, callback: CorsCallback) => {
+    origin: (
+      origin: string | undefined,
+      callback: CorsCallback,
+    ): void => {
+      // Permite requisições sem Origin, como Postman, Swagger e chamadas internas.
       if (!origin) {
-        return callback(null, true);
+        callback(null, true);
+        return;
       }
 
       if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
+        callback(null, true);
+        return;
       }
 
-      return callback(new Error(`Origin not allowed by CORS: ${origin}`));
+      callback(new Error(`Origin not allowed by CORS: ${origin}`));
     },
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
@@ -56,8 +62,11 @@ async function bootstrap() {
   });
 
   const port = Number(process.env.PORT ?? 3000);
+  const host = process.env.HOST ?? '0.0.0.0';
 
-  await app.listen(port);
+  await app.listen(port, host);
+
+  console.log(`EvFeedback API executando em ${await app.getUrl()}`);
 }
 
-bootstrap();
+void bootstrap();
