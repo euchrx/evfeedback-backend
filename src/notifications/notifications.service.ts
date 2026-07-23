@@ -31,27 +31,68 @@ export class NotificationsService {
 
   constructor(private readonly prisma: PrismaService) { }
 
-  private getTransporter() {
-    const host = process.env.SMTP_HOST?.trim();
+  private async getTransporter() {
+    const host = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com';
     const port = Number(process.env.SMTP_PORT || 587);
     const user = process.env.SMTP_USER?.trim();
     const pass = process.env.SMTP_PASS?.trim();
     const secure = process.env.SMTP_SECURE === 'true';
 
-    if (!host || !user || !pass) return null;
+    if (!user || !pass) {
+      return null;
+    }
+
+    const { resolve4 } = await import('node:dns/promises');
+
+    let ipv4Address: string;
+
+    try {
+      const addresses = await resolve4(host);
+
+      if (addresses.length === 0) {
+        throw new Error(`Nenhum endereço IPv4 encontrado para ${host}`);
+      }
+
+      ipv4Address = addresses[0];
+    } catch (error) {
+      this.logger.error(
+        `Não foi possível resolver o IPv4 do servidor SMTP ${host}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+
+      throw new BadRequestException(
+        `Não foi possível resolver o servidor SMTP ${host} em IPv4.`,
+      );
+    }
 
     const options = {
-      host,
+      host: ipv4Address,
       port,
       secure,
-      auth: { user, pass },
+      auth: {
+        user,
+        pass,
+      },
 
       family: 4,
 
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
-    } as SMTPTransport.Options & { family: 4 };
+      requireTLS: port === 587,
+
+      tls: {
+        servername: host,
+        minVersion: 'TLSv1.2',
+      },
+
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 30_000,
+    } as SMTPTransport.Options & {
+      family: 4;
+    };
+
+    this.logger.log(
+      `SMTP configurado em ${host} (${ipv4Address}) usando IPv4 e porta ${port}`,
+    );
 
     return nodemailer.createTransport(options);
   }
@@ -363,7 +404,7 @@ export class NotificationsService {
   }
 
   private async sendMail(to: string[], subject: string, html: string) {
-    const transporter = this.getTransporter();
+    const transporter = await this.getTransporter();
 
     if (!transporter) {
       throw new BadRequestException('SMTP não configurado.');
@@ -389,6 +430,8 @@ export class NotificationsService {
       throw new BadRequestException(
         error instanceof Error ? error.message : 'Erro ao enviar e-mail.',
       );
+    } finally {
+      transporter.close();
     }
   }
 
