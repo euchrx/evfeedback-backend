@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
+﻿import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -32,12 +32,14 @@ export class DashboardController {
   getSummary(
     @Req() req: { user: AuthUser },
     @Query('companyId') companyId?: string,
+    @Query('branchId') branchId?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
   ) {
     const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
 
     return this.service.getSummary(resolvedCompanyId, {
+      branchId,
       dateFrom,
       dateTo,
     });
@@ -48,12 +50,14 @@ export class DashboardController {
   getByBranch(
     @Req() req: { user: AuthUser },
     @Query('companyId') companyId?: string,
+    @Query('branchId') branchId?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
   ) {
     const resolvedCompanyId = this.resolveCompanyId(req.user, companyId);
 
     return this.service.getByBranch(resolvedCompanyId, {
+      branchId,
       dateFrom,
       dateTo,
     });

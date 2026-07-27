@@ -13,6 +13,7 @@ function parseAllowedOrigins(envValue?: string): string[] {
       'http://localhost:5173',
       'http://localhost:3000',
       'https://evfeedback-frontend.vercel.app',
+      'http://192.168.68.52:5173',
     ];
   }
 

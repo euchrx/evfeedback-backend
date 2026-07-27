@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+﻿import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 type DashboardFilters = {
+  branchId?: string;
   dateFrom?: string;
   dateTo?: string;
 };
@@ -54,12 +55,15 @@ export class DashboardService {
   async getSummary(companyId?: string, filters?: DashboardFilters) {
     const normalizedCompanyId = this.normalizeOptionalId(companyId);
     const createdAt = this.buildDateRange(filters);
+    const branchId = this.normalizeOptionalId(filters?.branchId);
 
     const where: {
       companyId?: string;
+      branchId?: string;
       createdAt?: Record<string, Date>;
     } = {
       ...(normalizedCompanyId ? { companyId: normalizedCompanyId } : {}),
+      ...(branchId ? { branchId } : {}),
       ...(createdAt ? { createdAt } : {}),
     };
 
@@ -87,6 +91,7 @@ export class DashboardService {
       where: {
         feedback: {
           ...(normalizedCompanyId ? { companyId: normalizedCompanyId } : {}),
+          ...(branchId ? { branchId } : {}),
           ...(createdAt ? { createdAt } : {}),
         },
       },
@@ -149,10 +154,12 @@ export class DashboardService {
   async getByBranch(companyId?: string, filters?: DashboardFilters) {
     const normalizedCompanyId = this.normalizeOptionalId(companyId);
     const createdAt = this.buildDateRange(filters);
+    const branchId = this.normalizeOptionalId(filters?.branchId);
 
     const branches = await this.prisma.branch.findMany({
       where: {
         ...(normalizedCompanyId ? { companyId: normalizedCompanyId } : {}),
+        ...(branchId ? { id: branchId } : {}),
       },
       select: {
         id: true,
